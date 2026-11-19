@@ -11,7 +11,7 @@ $FILES = @(
     "scripts/verify-auto-update.mjs",
     "scripts/upload-release.ps1",
     "scripts/sync-source.ps1",
-    "在线更新使用说明.md",
+    "README.md",
     ".gitignore"
 )
 
