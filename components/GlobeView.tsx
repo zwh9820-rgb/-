@@ -184,10 +184,12 @@ export default function GlobeView({ onEnterMap, onGoData }: { onEnterMap: () => 
     const heatPos: number[] = [];
     const seen = new Set<string>();
     ORDERS.forEach((o) => {
-      const key = `${o.lng.toFixed(1)}_${o.lat.toFixed(1)}`;
+      const lng = Number(o.lng), lat = Number(o.lat);
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) return; // 跳过无有效坐标的订单
+      const key = `${lng.toFixed(1)}_${lat.toFixed(1)}`;
       if (seen.has(key)) return;
       seen.add(key);
-      const v = latLngToVec3(o.lat, o.lng, R + 0.008);
+      const v = latLngToVec3(lat, lng, R + 0.008);
       heatPos.push(v.x, v.y, v.z);
     });
     heatGeo.setAttribute("position", new THREE.Float32BufferAttribute(heatPos, 3));
