@@ -2,7 +2,7 @@
 import puppeteer from "puppeteer-core";
 import { spawn } from "node:child_process";
 import path from "node:path";
-const ELECTRON = path.resolve("dist/win-unpacked/跨境全链路数据中台.exe");
+const ELECTRON = path.resolve("dist/win-unpacked/LinkVue 联视.exe");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const cleanEnv = { ...process.env }; delete cleanEnv.ELECTRON_RUN_AS_NODE; delete cleanEnv.NODE_OPTIONS;
 let pass = 0, fail = 0;
