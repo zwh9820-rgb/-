@@ -39,13 +39,15 @@ export default function DataCenterView({
   const schema = ENTITY_SCHEMAS.find((s) => s.key === active)!;
   const records: Record<string, any>[] = store[active] as any;
 
-  const filtered = useMemo(() => {
-    if (!q.trim()) return records;
-    const kw = q.toLowerCase();
-    return records.filter((r) =>
-      Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(kw))
-    );
-  }, [records, q]);
+  // 直接按当前 active 计算，不用 useMemo 缓存：
+  // 多实例/外部写入 localStorage 时，缓存的 records 引用可能落后于实际选中实体，
+  // 造成"切到订单却还显示上一类数据"的滞后现象。数据量以千计，直接过滤开销可忽略。
+  const filtered = q.trim()
+    ? records.filter((r) => {
+        const kw = q.toLowerCase();
+        return Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(kw));
+      })
+    : records;
 
   const openNew = () => {
     const defaults: Record<string, any> = {};
@@ -226,6 +228,7 @@ export default function DataCenterView({
       })}
 
       <Section
+        key={active}
         title={`${schema.icon} ${schema.label}数据`}
         extra={
           <div className="flex items-center gap-2 flex-wrap">
