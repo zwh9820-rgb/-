@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import * as THREE from "three";
 import { PORTS_DISPLAY, computeStats } from "@/lib/mock-data";
 import { useStore } from "@/lib/store";
@@ -76,11 +76,18 @@ export default function GlobeView({ onEnterMap, onGoData }: { onEnterMap: () => 
   const autoRotateRef = useRef(true);
   const resetSpinRef = useRef<(() => void) | null>(null);
   autoRotateRef.current = autoRotate;
+  // 用 ref 持有回调，避免父组件内联函数每次渲染都是新引用 → 触发整个 3D 场景重建
+  const callbacksRef = useRef({ onEnterMap, onGoData });
+  callbacksRef.current = { onEnterMap, onGoData };
   const store = useStore();
   const WAREHOUSES = store.warehouses;
   const ORDERS = store.orders;
   const CONTAINERS = store.containers;
-  const STATS = computeStats({ orders: ORDERS, warehouses: WAREHOUSES, containers: CONTAINERS, alerts: store.alerts });
+  const ALERTS = store.alerts;
+  const STATS = useMemo(
+    () => computeStats({ orders: ORDERS, warehouses: WAREHOUSES, containers: CONTAINERS, alerts: ALERTS }),
+    [ORDERS, WAREHOUSES, CONTAINERS, ALERTS]
+  );
 
   useEffect(() => {
     setDark(document.documentElement.classList.contains("dark"));
@@ -154,7 +161,7 @@ export default function GlobeView({ onEnterMap, onGoData }: { onEnterMap: () => 
         new THREE.MeshBasicMaterial({ color })
       );
       dot.position.copy(pos);
-      dot.userData = { name: wh.name, sub: `${wh.code} · 利用率 ${Math.round((wh.used / wh.capacity) * 100)}%`, color };
+      dot.userData = { name: wh.name, sub: `${wh.code} · 利用率 ${wh.capacity > 0 ? Math.round((wh.used / wh.capacity) * 100) : 0}%`, color };
       globe.add(dot);
       markers.push({ mesh: dot, wh });
 
@@ -258,7 +265,7 @@ export default function GlobeView({ onEnterMap, onGoData }: { onEnterMap: () => 
         mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
         mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
-        if (raycaster.intersectObjects(markers.map((m) => m.mesh)).length) onEnterMap();
+        if (raycaster.intersectObjects(markers.map((m) => m.mesh)).length) callbacksRef.current.onEnterMap();
       }
     };
     const onWheel = (e: WheelEvent) => { e.preventDefault(); camera.position.z = Math.max(3.4, Math.min(7, camera.position.z + e.deltaY * 0.002)); };
@@ -281,6 +288,8 @@ export default function GlobeView({ onEnterMap, onGoData }: { onEnterMap: () => 
     const clock = new THREE.Clock();
     const animate = () => {
       raf = requestAnimationFrame(animate);
+      // 窗口不可见时跳过渲染，避免后台空转导致卡顿/耗电
+      if (document.hidden) return;
       const t = clock.getElapsedTime();
       if (autoRotateRef.current && !dragging) autoSpin();
       rotY += (targetRotY - rotY) * 0.06;
@@ -308,10 +317,23 @@ export default function GlobeView({ onEnterMap, onGoData }: { onEnterMap: () => 
       renderer.domElement.removeEventListener("pointerdown", onDown);
       renderer.domElement.removeEventListener("wheel", onWheel);
       el.removeChild(renderer.domElement);
+      // 逐个释放 GPU 资源，防止反复进入/退出地球页导致显存泄漏
+      scene.traverse((obj: any) => {
+        if (obj.geometry) obj.geometry.dispose?.();
+        const mats = obj.material ? (Array.isArray(obj.material) ? obj.material : [obj.material]) : [];
+        mats.forEach((m: any) => {
+          if (!m) return;
+          for (const key of Object.keys(m)) {
+            const val = (m as any)[key];
+            if (val && val.isTexture) val.dispose?.();
+          }
+          m.dispose?.();
+        });
+      });
       renderer.dispose();
       resetSpinRef.current = null;
     };
-  }, [dark, onEnterMap, WAREHOUSES, ORDERS, CONTAINERS]);
+  }, [dark, WAREHOUSES, ORDERS, CONTAINERS]);
 
   return (
     <div className="relative w-full h-full overflow-hidden" data-auto-rotate={autoRotate ? "1" : "0"} style={{ background: dark ? "radial-gradient(ellipse at 50% 40%, #101c30 0%, #080d16 70%)" : "radial-gradient(ellipse at 50% 40%, #eaf1ff 0%, #f7f9fc 70%)" }}>
