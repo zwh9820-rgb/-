@@ -12,17 +12,23 @@ const RESULTS = [];
 function check(name, ok, info) { RESULTS.push({ name, ok: !!ok, info }); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${info ? " | " + info : ""}`); }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// 预置 localStorage：一个启用的根目录
-function seedLocalStorage() {
-  const dir = path.join(USERDATA, "Default", "Local Storage", "leveldb");
-  fs.mkdirSync(dir, { recursive: true });
+// 自包含：每次运行前重建测试目录（含子目录与文件），用于验证目录树下钻
+function seedTestFiles() {
+  fs.rmSync(TEST_DIR, { recursive: true, force: true });
+  fs.mkdirSync(path.join(TEST_DIR, "产品说明书", "欧洲站"), { recursive: true });
+  fs.mkdirSync(path.join(TEST_DIR, "产品说明书", "美国站"), { recursive: true });
+  fs.mkdirSync(path.join(TEST_DIR, "产品清单", "2026"), { recursive: true });
+  const note = "# 在线更新说明\n\n这是一个用于文件中心预览验证的示例文档，包含版本与更新内容。\n";
+  fs.writeFileSync(path.join(TEST_DIR, "产品说明书", "欧洲站", "说明书A.md"), note, "utf8");
+  fs.writeFileSync(path.join(TEST_DIR, "产品说明书", "美国站", "说明书B.md"), note, "utf8");
+  fs.writeFileSync(path.join(TEST_DIR, "产品清单", "2026", "清单.json"), JSON.stringify({ version: "1.0", items: [] }), "utf8");
 }
 
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE; delete env.NODE_OPTIONS;
 let browser, proc;
 try {
-  seedLocalStorage();
+  seedTestFiles();
   proc = spawn(ROOT, [
     `--remote-debugging-port=9276`,
     `--user-data-dir=${USERDATA}`,
@@ -135,4 +141,5 @@ try {
   try { await browser?.disconnect(); } catch {}
   try { proc?.kill("SIGKILL"); } catch {}
   try { fs.rmSync(USERDATA, { recursive: true, force: true }); } catch {}
+  try { fs.rmSync(TEST_DIR, { recursive: true, force: true }); } catch {}
 }
