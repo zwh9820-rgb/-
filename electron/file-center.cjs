@@ -6,6 +6,9 @@ const fs = require("fs");
 const fsp = fs.promises;
 const path = require("path");
 
+// Office 文档应用内预览（Excel→表格 / Word→HTML），实现在独立模块便于回归验证
+const officePreview = require("./office-preview.cjs");
+
 // 常见文档/图片/文本后缀，扫描时纳入索引；其余忽略（避免索引系统文件）
 const INCLUDE_EXT = new Set([
   ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".csv", ".txt", ".md", ".json",
@@ -133,7 +136,17 @@ function registerFileCenterIPC() {
         const mime = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".bmp": "image/bmp", ".webp": "image/webp" }[ext];
         return { kind: "base64", data: buf.toString("base64"), mime };
       }
-      // 其他类型（Word/Excel/PPT/压缩包等）不支持内嵌预览，提示用系统程序打开
+      // Excel → HTML 表格（应用内预览）
+      if ([".xlsx", ".xls"].includes(ext) && officePreview.available.xlsx) {
+        try { return { kind: "html", data: officePreview.xlsxToHtml(filePath), mime: "text/html" }; }
+        catch (e) { return { error: "Excel 解析失败：" + String(e).slice(0, 120) }; }
+      }
+      // Word(docx) → HTML（应用内预览）
+      if (ext === ".docx" && officePreview.available.mammoth) {
+        try { return { kind: "html", data: await officePreview.docxToHtml(filePath), mime: "text/html" }; }
+        catch (e) { return { error: "Word 解析失败：" + String(e).slice(0, 120) }; }
+      }
+      // 其他类型（旧版 .doc/PPT/压缩包等）不支持内嵌预览，提示用系统程序打开
       return { error: "UNPREVIEWABLE" };
     } catch (e) { return { error: "读取失败：" + String(e) }; }
   });
