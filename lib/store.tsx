@@ -28,6 +28,7 @@ const LS = {
   fileRoots: "cbh_file_roots_v1",
   filePrefs: "cbh_file_prefs_v1",
   fileSettings: "cbh_file_settings_v1",
+  mapAutoFly: "cbh_map_auto_fly_v1",
 } as const;
 
 // ============ 文件中心类型 ============
@@ -280,6 +281,8 @@ interface StoreValue {
   fileRoots: FileRoot[]; setFileRoots: (v: FileRoot[] | ((p: FileRoot[]) => FileRoot[])) => void;
   filePrefs: FilePref[]; setFilePrefs: (v: FilePref[] | ((p: FilePref[]) => FilePref[])) => void;
   fileSettings: FileCenterSettings; setFileSettings: (v: FileCenterSettings) => void;
+  // 地图点击区域是否自动 flyTo 跳转（用户可关闭，保持当前视角）
+  mapAutoFly: boolean; setMapAutoFly: (v: boolean) => void;
 }
 const StoreContext = createContext<StoreValue | null>(null);
 
@@ -342,6 +345,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const setFileSettings = useCallback((v: FileCenterSettings) => {
     setFileSettingsState(v);
     writeLS(LS.fileSettings, v);
+  }, []);
+  // 地图点击是否自动跳转：默认关闭（尊重用户"点击后不要自动放大"的偏好）
+  const [mapAutoFly, setMapAutoFlyState] = useState<boolean>(() =>
+    typeof window === "undefined" ? false : readLS(LS.mapAutoFly, false)
+  );
+  const setMapAutoFly = useCallback((v: boolean) => {
+    setMapAutoFlyState(v);
+    writeLS(LS.mapAutoFly, v);
   }, []);
   const [plainSecrets, setPlainSecrets] = useState<Record<string, { appKey: string; appSecret: string }>>({});
 
@@ -427,6 +438,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     alertRead, setAlertRead,
     costRates, setCostRates, targets, setTarget, deleteTarget,
     fileRoots, setFileRoots, filePrefs, setFilePrefs, fileSettings, setFileSettings,
+    mapAutoFly, setMapAutoFly,
   }), [warehouses, orders, skus, inventory, containers, priceCards, alerts,
     upsertRecord, deleteRecord, clearEntity, upsertWarehouse, deleteWarehouse,
     apiConfigs, saveApiConfig, deleteApiConfig, thresholds, setThresholds, syncInterval, setSyncInterval, plainSecrets,
@@ -435,7 +447,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     geoLayers, addGeoLayer, toggleGeoLayer, deleteGeoLayer, alertRead, setAlertRead,
     costRates, setCostRates, targets, setTarget, deleteTarget,
     setWarehouses, setOrders, setSkus, setInventory, setContainers, setPriceCards, setAlerts,
-    fileRoots, setFileRoots, filePrefs, setFilePrefs, fileSettings, setFileSettings]);
+    fileRoots, setFileRoots, filePrefs, setFilePrefs, fileSettings, setFileSettings,
+    mapAutoFly, setMapAutoFly]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
