@@ -23,6 +23,7 @@ $FILES = @(
     "next.config.mjs",
     "在线更新使用说明.md",
     "lib/import-mapper.ts",
+    "scripts/verify-changelog.mjs",
     "scripts/verify-status-import.mjs",
     "scripts/verify-sku-import.mjs",
     "scripts/inspect-template.mjs",
