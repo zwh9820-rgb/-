@@ -51,7 +51,7 @@ Module._load = origLoad;
 const def = updater.readConfig();
 check("默认配置 provider=github", def.provider === "github");
 check("默认配置 autoCheck=true", def.autoCheck === true);
-check("默认未配置 owner/repo", def.owner === "" && def.repo === "");
+check("默认预填官方更新源 owner/repo", def.owner === "zwh9820-rgb" && def.repo === "-");
 
 // 写读配置
 const wOk = updater.writeConfig({ owner: "testuser", repo: "cbh-release", autoCheck: false });
@@ -73,10 +73,10 @@ check("get-info 返回版本", info.version === "0.1.0" && info.packaged === tru
 check("autoDownload 已关闭", mockAutoUpdater.autoDownload === false);
 check("autoInstallOnAppQuit 已关闭", mockAutoUpdater.autoInstallOnAppQuit === false);
 
-// 未配置时 check 返回失败（先清空配置，避免被前面的写测试污染）
+// 空 owner/repo 会自动回填官方更新源（向后兼容旧配置）
 updater.writeConfig({ owner: "", repo: "", feedUrl: "" });
-const bad = await handlers["updater:check"]();
-check("未配置更新源时 check 失败", bad.ok === false);
+const backfilled = updater.readConfig();
+check("空配置自动回填官方源", backfilled.owner === "zwh9820-rgb" && backfilled.repo === "-");
 
 // 配置后 check 成功 + feed 走 github
 await handlers["updater:set-config"](null, { owner: "u", repo: "r", autoCheck: true, feedUrl: "" });
