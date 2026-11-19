@@ -91,7 +91,20 @@ export default function FileCenterView({ showToast }: { showToast: (m: string) =
   const [preview, setPreview] = useState<ScannedFile | null>(null);
   const [previewData, setPreviewData] = useState<{ kind: string; data: string; mime: string; error?: string } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [showAdmin, setShowAdmin] = useState(false);
+
+  // base64 → Blob URL：比 data: URL 更可靠（大图/特殊编码不会白屏），用完需 revoke
+  const base64ToBlobUrl = (base64: string, mime: string) => {
+    const bin = atob(base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return URL.createObjectURL(new Blob([bytes], { type: mime }));
+  };
+  const closePreview = () => {
+    if (previewImageUrl) URL.revokeObjectURL(previewImageUrl);
+    setPreviewImageUrl(null); setPreview(null); setPreviewData(null);
+  };
 
   const enabledRoots = useMemo(() => (store.fileRoots || []).filter((r) => r.enabled).map((r) => r.path), [store.fileRoots]);
   const prefMap = useMemo(() => {
@@ -219,9 +232,14 @@ export default function FileCenterView({ showToast }: { showToast: (m: string) =
       return;
     }
     setPreview(f); setPreviewLoading(true); setPreviewData(null);
+    if (previewImageUrl) { URL.revokeObjectURL(previewImageUrl); setPreviewImageUrl(null); }
     try {
       const res = await fileAPI.read(f.path, enabledRoots);
       setPreviewData(res);
+      if (res?.kind === "base64" && (res.mime || "").startsWith("image/") && !res.error) {
+        try { setPreviewImageUrl(base64ToBlobUrl(res.data, res.mime)); }
+        catch { setPreviewData({ kind: "text", data: "", mime: "", error: "图片数据解析失败，请用系统程序打开" }); }
+      }
     } catch (e) { setPreviewData({ kind: "text", data: "", mime: "", error: String(e) }); }
     finally { setPreviewLoading(false); }
   };
@@ -527,13 +545,13 @@ export default function FileCenterView({ showToast }: { showToast: (m: string) =
 
       {/* 预览弹窗 */}
       {preview && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4" onClick={() => setPreview(null)}>
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4" onClick={closePreview}>
           <div className="w-[1000px] max-w-full h-[88vh] rounded-2xl flex flex-col overflow-hidden" style={{ background: "var(--surface)" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "var(--border)" }}>
               <div className="min-w-0"><div className="text-[14px] font-bold truncate flex items-center gap-2"><FileIcon ext={preview.ext} /> {preview.name}</div><div className="text-[10.5px] font-mono truncate" style={{ color: "var(--text-3)" }}>{preview.path}</div></div>
               <div className="flex items-center gap-2">
                 {canDownload(preview) && <button className="btn !h-8" onClick={() => doDownload(preview)}><Download size={13} /> 下载</button>}
-                <button className="p-1.5 rounded" onClick={() => setPreview(null)}><X size={18} /></button>
+                <button className="p-1.5 rounded" onClick={closePreview}><X size={18} /></button>
               </div>
             </div>
             <div className="flex-1 overflow-auto p-4 flex items-center justify-center" style={{ background: "var(--surface-2)" }}>
@@ -543,8 +561,10 @@ export default function FileCenterView({ showToast }: { showToast: (m: string) =
                  <div className="text-center"><FileIcon ext={preview.ext} size={48} /><div className="mt-3 text-[13px]" style={{ color: "var(--text-2)" }}>此格式暂不支持在线预览</div><button className="btn btn-primary mt-3" onClick={() => doOpen(preview)}><ExternalLink size={13} /> 用系统程序打开</button></div>
                ) : previewData.error ? (
                  <div className="text-[12px]" style={{ color: "var(--red)" }}>{previewData.error}</div>
+               ) : previewData.kind === "base64" && previewData.mime.startsWith("image/") ? (
+                 previewImageUrl ? <img src={previewImageUrl} alt={preview.name} className="max-w-full max-h-full object-contain" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} /> :
+                 <div className="text-center"><ImageIcon size={48} style={{ color: "var(--green)" }} /><div className="mt-3 text-[13px]" style={{ color: "var(--text-2)" }}>图片加载失败</div><button className="btn btn-primary mt-3" onClick={() => doOpen(preview)}><ExternalLink size={13} /> 用系统程序打开</button></div>
                ) : previewData.kind === "base64" ? (
-                 previewData.mime.startsWith("image/") ? <img src={`data:${previewData.mime};base64,${previewData.data}`} alt={preview.name} className="max-w-full max-h-full object-contain" /> :
                  <div className="text-center"><FileIcon ext={preview.ext} size={48} /><div className="mt-3 text-[13px]" style={{ color: "var(--text-2)" }}>此格式请在独立窗口查看</div><button className="btn btn-primary mt-3" onClick={() => doOpen(preview)}><ExternalLink size={13} /> 用系统程序打开</button></div>
                ) : (
                  <pre className="w-full h-full overflow-auto p-4 rounded-lg text-[12px] whitespace-pre-wrap break-words" style={{ background: "var(--surface)", color: "var(--text-2)" }}>{previewData.data || "（空文件）"}</pre>
