@@ -38,7 +38,8 @@ try {
   check("显示「发现的问题」", body.includes("发现的问题"));
   check("显示「解决的问题」", body.includes("解决的问题"));
   check(`展示最新版本 v${currentVersion}`, body.includes(`v${currentVersion}`));
-  check("展示历史版本 v0.1.1", body.includes("v0.1.1"));
+  const historyVersion = data.versions[data.versions.length - 1].version;
+  check(`展示历史版本 v${historyVersion}`, body.includes(`v${historyVersion}`));
   const sample = data.versions.find((v) => v.version === currentVersion).issues[0];
   check("说明正文与数据源一致", body.includes(sample.slice(0, 12)), sample.slice(0, 20));
   check("无页面崩溃", !body.includes("Application error"));
