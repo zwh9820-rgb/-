@@ -9,6 +9,24 @@ const updater = require("./updater.cjs");
 // 必须在 app.ready 之前设置。
 app.setPath("userData", path.join(app.getPath("appData"), "cross-border-data-hub"));
 
+// 单实例锁：避免同时运行多个实例导致 localStorage 按不同端口隔离、数据读写混乱、
+// 以及更新后旧实例仍占用窗口/端口，表现为"切换标签数据滞后/串台"。
+// 第二个实例启动时激活已有窗口后自行退出。
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+  process.exit(0);
+}
+app.on("second-instance", () => {
+  const wins = BrowserWindow.getAllWindows();
+  if (wins.length) {
+    const w = wins[0];
+    if (w.isMinimized()) w.restore();
+    w.show();
+    w.focus();
+  }
+});
+
 const isDev = !!process.env.ELECTRON_DEV;
 // 固定端口：localStorage 按 origin(协议+主机+端口)隔离，端口随机会导致每次启动读到空数据、
 // 更新前后数据"消失"。固定后业务数据跨重启/跨版本稳定保留。
