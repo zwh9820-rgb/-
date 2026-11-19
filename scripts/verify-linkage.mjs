@@ -25,7 +25,8 @@ try {
   await page.reload({ waitUntil: "domcontentloaded" });
   await sleep(2500);
 
-  // 首页 KPI 应显示 1 单 / 1 仓 / 1 柜
+  // v0.1.7 起默认页为驾驶舱，KPI 在 3D 地球页；主动进入后读取
+  await goto("3D 地球");
   const kpi = await page.evaluate(() => document.body.textContent || "");
   check("首页 KPI 反映录入数据（累计订单 1）", /累计订单\s*1\s*单/.test(kpi));
   check("首页 KPI 反映录入数据（海外仓 1）", /海外仓\s*1\s*个/.test(kpi));
