@@ -7,7 +7,7 @@ import {
   ReceiptText, FileBarChart, Bell, Settings, ChevronLeft, PanelLeftClose,
   Search, Sun, Moon, Cloud, CloudOff, RefreshCw, Menu, X, Command, Boxes,
   ChevronRight, CircleDot, Wifi, WifiOff, Check, LogOut, Database,
-  TrendingUp, DollarSign, Package,
+  TrendingUp, DollarSign, Package, FolderOpen,
 } from "lucide-react";
 import clsx from "clsx";
 import type { ThemeMode } from "@/lib/types";
@@ -17,7 +17,7 @@ import { useStore } from "@/lib/store";
 export type ModuleKey =
   | "globe" | "map" | "dashboard" | "orders" | "inventory" | "shipping"
   | "sku" | "profit" | "turnover" | "trend" | "pricecard" | "reports"
-  | "alerts" | "datacenter" | "settings";
+  | "alerts" | "datacenter" | "fileCenter" | "settings";
 
 const NAV_GROUPS: { label: string; items: { key: ModuleKey; label: string; icon: any; badge?: number }[] }[] = [
   {
@@ -50,7 +50,10 @@ const NAV_GROUPS: { label: string; items: { key: ModuleKey; label: string; icon:
   },
   {
     label: "数据",
-    items: [{ key: "datacenter", label: "数据中心 · 录入", icon: Database }],
+    items: [
+      { key: "datacenter", label: "数据中心 · 录入", icon: Database },
+      { key: "fileCenter", label: "文件中心", icon: FolderOpen },
+    ],
   },
   {
     label: "系统",
@@ -73,6 +76,7 @@ const TITLES: Record<ModuleKey, { title: string; sub: string }> = {
   reports: { title: "报表中心", sub: "内置模板、定时周报与多格式导出" },
   alerts: { title: "全局异常预警", sub: "跨模块异常监控与地图点位联动" },
   datacenter: { title: "数据中心", sub: "手动录入 / 编辑 / CSV 导入你的真实业务数据" },
+  fileCenter: { title: "文件中心", sub: "统一查找与预览网盘/本地的说明书、清单等文件" },
   settings: { title: "系统设置", sub: "API 密钥、地理边界、阈值与主题" },
 };
 
@@ -91,6 +95,7 @@ const PricecardView = dynamic(() => import("./views/PricecardView"), { ssr: fals
 const ReportsView = dynamic(() => import("./views/ReportsView"), { ssr: false });
 const AlertsView = dynamic(() => import("./views/AlertsView"), { ssr: false });
 const DataCenterView = dynamic(() => import("./views/DataCenterView"), { ssr: false });
+const FileCenterView = dynamic(() => import("./views/FileCenterView"), { ssr: false });
 const SettingsView = dynamic(() => import("./views/SettingsView"), { ssr: false });
 
 function ViewLoading() {
@@ -173,6 +178,7 @@ export default function AppShell({ theme, setTheme }: { theme: ThemeMode; setThe
       case "reports": return <ReportsView showToast={showToast} />;
       case "alerts": return <AlertsView onNavigate={goto} />;
       case "datacenter": return <DataCenterView showToast={showToast} onNavigate={goto} />;
+      case "fileCenter": return <FileCenterView showToast={showToast} />;
       case "settings": return <SettingsView theme={theme} setTheme={setTheme} showToast={showToast} initialTab={settingsTab} onTabConsumed={() => setSettingsTab("api")} />;
     }
   };
