@@ -4,6 +4,10 @@ const fs = require("fs");
 const path = require("path");
 const net = require("net");
 const updater = require("./updater.cjs");
+const fileCenter = require("./file-center.cjs");
+
+// 注册文件中心 IPC（目录扫描/预览/打开/另存）
+fileCenter.registerFileCenterIPC();
 
 // 锁定 userData 目录：应用显示名改为 LinkVue/联视 后，仍读写原数据目录，历史录入数据不丢失。
 // 必须在 app.ready 之前设置。
