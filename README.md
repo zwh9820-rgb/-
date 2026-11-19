@@ -132,6 +132,7 @@
 | `verify-auto-update` / `verify-electron-e2e` / `verify-data-persist` | 更新链路、preload 注入、数据跨重启保留 |
 | `verify-dirty-data` / `verify-electron-dirty` | 脏数据（缺坐标/金额）不崩溃 |
 | `verify-rebrand` | 改名后品牌显示、旧数据可读 |
+| `verify-changelog` | 应用内版本更新说明展示、与 changelog.json 一致 |
 
 运行方式（顺序执行，避免多浏览器抢占资源导致时序误报）：
 ```bash
