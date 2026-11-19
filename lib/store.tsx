@@ -149,13 +149,69 @@ function writeLS(key: string, value: unknown) {
 
 // ============ 通用持久化集合 hook（业务数据默认全部为空）============
 type Setter<T> = (v: T[] | ((prev: T[]) => T[])) => void;
+
+// 数值兜底：脏数据（空列/手录缺失/旧版本）里的 undefined/null/非数字统一转 0，
+// 防止下游 .toFixed() 等崩溃。字符串数字也会转 number。
+const num = (v: any, d = 0): number => {
+  if (v === null || v === undefined || v === "") return d;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : d;
+};
+
+// 按实体补齐关键数值字段，保证所有视图拿到的数据都是可安全计算的
+function normalizeEntity(key: string, arr: any[]): any[] {
+  if (!Array.isArray(arr)) return [];
+  return arr.map((o) => {
+    if (!o || typeof o !== "object") return o;
+    switch (key) {
+      case LS.orders:
+        return {
+          ...o,
+          lng: num(o.lng), lat: num(o.lat),
+          qty: num(o.qty, 1), amount: num(o.amount), weight: num(o.weight),
+          returnRisk: num(o.returnRisk),
+          commission: num(o.commission), firstMile: num(o.firstMile),
+          lastMile: num(o.lastMile), returnLoss: num(o.returnLoss), other: num(o.other),
+        };
+      case LS.warehouses:
+        return {
+          ...o,
+          lng: num(o.lng), lat: num(o.lat),
+          capacity: num(o.capacity), used: num(o.used),
+          skuCount: num(o.skuCount), dailyOutbound: num(o.dailyOutbound),
+        };
+      case LS.containers:
+        return {
+          ...o,
+          originLng: num(o.originLng), originLat: num(o.originLat),
+          destLng: num(o.destLng), destLat: num(o.destLat),
+          progress: num(o.progress), cargoValue: num(o.cargoValue),
+          volume: num(o.volume), skuCount: num(o.skuCount),
+          items: Array.isArray(o.items) ? o.items : [],
+        };
+      case LS.inventory:
+        return {
+          ...o,
+          available: num(o.available), reserved: num(o.reserved),
+          total: num(o.total), safetyStock: num(o.safetyStock), ageDays: num(o.ageDays),
+        };
+      case LS.skus:
+        return { ...o, price: num(o.price), weight: num(o.weight), cost: num(o.cost) };
+      default:
+        return o;
+    }
+  });
+}
+
 function usePersistedCollection<T>(key: string): [T[], Setter<T>] {
-  const [value, setValue] = useState<T[]>(() => (typeof window === "undefined" ? [] : readLS<T[]>(key, [])));
+  const [value, setValue] = useState<T[]>(() =>
+    typeof window === "undefined" ? [] : normalizeEntity(key, readLS<any[]>(key, [])) as T[]
+  );
   const set = useCallback<Setter<T>>((next) => {
     setValue((prev) => {
       const resolved = typeof next === "function" ? (next as (p: T[]) => T[])(prev) : next;
       writeLS(key, resolved);
-      return resolved;
+      return normalizeEntity(key, resolved as any[]) as T[];
     });
   }, [key]);
   return [value, set];
