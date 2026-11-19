@@ -133,6 +133,34 @@ try {
   const afterRerender = await page.evaluate(() => !!document.querySelector(".maplibregl-popup"));
   check("关闭后重渲染不再重建弹窗(无残留)", !afterRerender);
 
+  // ===== 返回上级后，订单明细卡片必须消失（用户反馈的核心残留问题）=====
+  // 当前在城市层(订单明细)。返回一级应到 CA 城市排名，订单卡片必须清空。
+  const clickBack = () => page.evaluate(() => {
+    const b = [...document.querySelectorAll("button")].find((x) => (x.textContent || "").includes("返回上一级"));
+    if (b) { b.click(); return true; } return false;
+  });
+  const orderCardsInList = () => page.evaluate(() => {
+    const cards = [...document.querySelectorAll("button")].filter((b) => {
+      const c = b.className || "";
+      return c.includes("flex-col") && c.includes("gap-1") && /ORD\d{4}/.test(b.textContent || "");
+    });
+    return cards.length;
+  });
+
+  check("城市层有返回上一级按钮", await clickBack()); await sleep(1300);
+  check("返回到 CA 城市层后订单卡片清空", (await orderCardsInList()) === 0, `残留卡片=${await orderCardsInList()}`);
+  check("返回后显示城市排名", (await body()).includes("城市 · 按订单量排序"));
+
+  // 再返回到美国州层
+  await clickBack(); await sleep(1300);
+  check("返回到美国州层后订单卡片清空", (await orderCardsInList()) === 0, `残留卡片=${await orderCardsInList()}`);
+  check("州层显示州排名(California/Texas)", (await body()).includes("州 / 省 · 按订单量排序") && (await body()).includes("CA"));
+
+  // 再返回到世界层
+  await clickBack(); await sleep(1300);
+  check("返回到世界层后订单卡片清空", (await orderCardsInList()) === 0, `残留卡片=${await orderCardsInList()}`);
+  check("世界层显示国家排名", (await body()).includes("国家 / 地区 · 按订单量排序"));
+
   check("全程无页面错误", errors.length === 0, errors.slice(0, 2).join(" | "));
 } catch (e) {
   check("执行过程无异常", false, String(e).slice(0, 200));
