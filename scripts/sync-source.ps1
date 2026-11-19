@@ -33,6 +33,7 @@ $FILES = @(
     ".gitignore",
     "scripts/verify-sample-data.mjs",
     "scripts/verify-file-center.mjs",
+    "scripts/verify-pdf-preview.mjs",
     "scripts/verify-changelog.mjs",
     "scripts/verify-data-doctor.mjs",
     "scripts/verify-single-instance.mjs",
