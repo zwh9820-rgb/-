@@ -191,7 +191,7 @@ function warehouseGeoJSON(warehouses: WarehouseT[]) {
       properties: {
         id: w.id, name: w.name, code: w.code, health: w.health,
         used: w.used, capacity: w.capacity, skuCount: w.skuCount,
-        utilization: Math.round((w.used / w.capacity) * 100),
+        utilization: w.capacity > 0 ? Math.round((w.used / w.capacity) * 100) : 0,
       },
     })),
   };
@@ -359,7 +359,8 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
   useEffect(() => { if (mapRef.current) mapRef.current.dataset.detailFields = detailFields.join("|"); }, [detailFields]);
   const [ready, setReady] = useState(false);
   const [geoVersion, setGeoVersion] = useState(0);
-  const [coords, setCoords] = useState<[number, number]>([0, 0]);
+  // 坐标显示用 ref 直接写 DOM，避免 mousemove 每次 setState 触发整个大组件重渲染
+  const coordTextRef = useRef<HTMLSpanElement>(null);
   const [measureMode, setMeasureMode] = useState(false);
   const [measurePts, setMeasurePts] = useState<[number, number][]>([]);
   const measureModeRef = useRef(false);
@@ -389,7 +390,9 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "bottom-right");
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 140, unit: "metric" }), "bottom-left");
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-left");
-    map.on("mousemove", (e) => setCoords([+e.lngLat.lng.toFixed(3), +e.lngLat.lat.toFixed(3)]));
+    map.on("mousemove", (e) => {
+      if (coordTextRef.current) coordTextRef.current.textContent = `${e.lngLat.lat.toFixed(3)}°N, ${e.lngLat.lng.toFixed(3)}°E`;
+    });
     // 暴露地图中心，便于自动化校验定位是否正确（无害）
     const syncCenter = () => {
       const c = map.getCenter();
@@ -502,6 +505,8 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
     setTimeout(() => map.resize(), 300);
     return () => {
       resizeObs.disconnect();
+      // 清理底图切换可能遗留的轮询定时器，避免卸载后仍对已移除的 map 操作
+      if (basemapCleanup.current) { basemapCleanup.current(); basemapCleanup.current = null; }
       labelMarkers.current.forEach((m) => m.remove()); labelMarkers.current = [];
       heatMarkers.current.forEach((m) => m.remove()); heatMarkers.current = [];
       infoMarker.current?.remove(); infoMarker.current = null;
@@ -1218,7 +1223,7 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
         </div>
 
         <div className="absolute bottom-5 right-4 z-10 rounded-lg px-2.5 py-1.5 text-[10.5px] font-mono" style={{ background: "color-mix(in srgb, var(--surface) 92%, transparent)", border: "1px solid var(--border)", color: "var(--text-2)" }}>
-          <LocateFixed size={11} className="inline mr-1" />{coords[1].toFixed(3)}°N, {coords[0].toFixed(3)}°E
+          <LocateFixed size={11} className="inline mr-1" /><span ref={coordTextRef}>0.000°N, 0.000°E</span>
         </div>
 
         {boxSelection && (
