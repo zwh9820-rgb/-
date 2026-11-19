@@ -2,9 +2,11 @@
 import puppeteer from "puppeteer-core";
 import { spawn } from "node:child_process";
 import path from "node:path";
+import fs from "node:fs";
 
 const ELECTRON = path.resolve("dist/win-unpacked/LinkVue 联视.exe");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const PKG_VERSION = JSON.parse(fs.readFileSync(path.resolve("package.json"),"utf8")).version;
 let pass = 0, fail = 0;
 const check = (n, ok, d) => { console.log(`${ok ? "✓" : "✗"} ${n}${d ? " — " + d : ""}`); ok ? pass++ : fail++; };
 
@@ -35,7 +37,7 @@ try {
   check("updaterAPI 方法完整", ["getInfo", "check", "download", "install", "backup", "onStatus"].every((m) => info.methods.includes(m)), info.methods.join(","));
 
   const appInfo = await page.evaluate(() => (window).updaterAPI.getInfo());
-  check("getInfo 返回版本号", appInfo && appInfo.version === "0.1.0", JSON.stringify(appInfo));
+  check("getInfo 返回版本号", appInfo && appInfo.version === PKG_VERSION, JSON.stringify(appInfo));
   const cfg = await page.evaluate(() => (window).updaterAPI.getConfig());
   check("getConfig 返回配置", cfg && typeof cfg.autoCheck === "boolean", JSON.stringify(cfg));
 
