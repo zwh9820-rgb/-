@@ -3,9 +3,10 @@
 import { useState, useRef, useMemo } from "react";
 import {
   Database, Plus, Pencil, Trash2, Upload, Download, X, Search,
-  CheckCircle2, AlertTriangle, FileSpreadsheet, Info, RotateCcw, Sparkles,
+  CheckCircle2, AlertTriangle, FileSpreadsheet, Info, RotateCcw, Sparkles, FlaskConical,
 } from "lucide-react";
 import { useStore, type EntityKey } from "@/lib/store";
+import { generateSampleData } from "@/lib/sample-data";
 import {
   ENTITY_SCHEMAS, templateCsv,
   type EntitySchema, type FieldDef,
@@ -157,6 +158,25 @@ export default function DataCenterView({
 
   const totalCount = ENTITY_SCHEMAS.reduce((s, sc) => s + ((store[sc.key] as any[])?.length || 0), 0);
 
+  // ---- 示例数据：一键加载 / 一键清空（客户可自行删除换成自己的数据） ----
+  const loadSampleData = () => {
+    if (totalCount > 0 && !window.confirm(`当前已有 ${totalCount} 条数据。加载示例数据会追加示例记录，确定继续吗？（可随时一键清空）`)) return;
+    const bundle = generateSampleData();
+    (Object.keys(bundle) as EntityKey[]).forEach((k) => {
+      (store as any)[`set${cap(k)}`]((prev: any[]) => [...(bundle[k] || []), ...(prev || [])]);
+    });
+    showToast("已加载示例数据（7 类全关联），可到各模块查看效果");
+  };
+  const clearAllData = () => {
+    if (!totalCount) { showToast("当前没有数据"); return; }
+    if (!window.confirm(`确定清空全部 ${totalCount} 条数据吗？此操作不可撤销，清空后你可导入自己的数据。`)) return;
+    (Object.keys(ENTITY_SCHEMAS.reduce((m, s) => (m[s.key] = 1, m), {} as Record<string, 1>)) as EntityKey[]).forEach((k) => {
+      (store as any)[`set${cap(k)}`]([]);
+    });
+    setActive("warehouses"); setQ("");
+    showToast("已清空全部数据，可开始导入自己的数据");
+  };
+
   // 数据体检：检测被错导到错误集合的脏数据（如订单数据进了海外仓）
   const dataIssues = useMemo(() => {
     const all: Record<EntityKey, any[]> = {
@@ -174,7 +194,8 @@ export default function DataCenterView({
         desc="所有业务数据由你手动录入或 CSV 导入，保存在本机；程序不再预置任何虚拟数据。"
         actions={
           <>
-            <span className="tag" style={{ background: "var(--surface-2)", color: "var(--text-2)" }}>共 {totalCount} 条真实数据</span>
+            <span className="tag" style={{ background: "var(--surface-2)", color: "var(--text-2)" }}>共 {totalCount} 条数据</span>
+            <button className="btn" onClick={loadSampleData} title="生成全套关联示例数据，随时可清空"><FlaskConical size={14} /> 加载示例数据</button>
             <button className="btn btn-primary" onClick={() => setSmartOpen(true)}><Sparkles size={14} /> 智能导入</button>
             <button className="btn" onClick={() => onNavigate("settings")}><Database size={14} /> 接口配置</button>
           </>
@@ -202,6 +223,15 @@ export default function DataCenterView({
           <b style={{ color: "var(--text)" }}>推荐用「智能导入」</b>：一次把原始 Excel 全放进去，系统自动识别是订单/库存/SKU，并自动匹配每一列；你只需确认每列读成什么。地址会自动按「州字段 / 邮编 → 州中心」聚合，不再逐个猜坐标。
           <button className="ml-1 underline" style={{ color: "var(--brand)" }} onClick={() => setSmartOpen(true)}>立即打开 →</button>
         </div>
+      </div>
+
+      {/* 示例数据引导 */}
+      <div className="mb-3 flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[11.5px]" style={{ background: "color-mix(in srgb, var(--amber) 7%, transparent)", color: "var(--text-2)" }}>
+        <FlaskConical size={15} className="shrink-0" style={{ color: "var(--amber)" }} />
+        <div className="flex-1">
+          <b style={{ color: "var(--text)" }}>第一次使用？</b> 点右上角「加载示例数据」即可生成 7 类相互关联的演示数据（仓库/SKU/订单/库存/海运/价卡/预警），体验地图与分析；之后可一键清空换成你自己的数据。
+        </div>
+        <button className="btn !h-7 !text-[11px] shrink-0" style={{ color: "var(--red)" }} onClick={clearAllData} disabled={!totalCount}><Trash2 size={11} /> 清空全部数据</button>
       </div>
 
       {/* 数据体检：提示被错导到错误集合的脏数据，支持一键清空后重新导入 */}
