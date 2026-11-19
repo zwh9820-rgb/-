@@ -561,6 +561,9 @@ export default function FileCenterView({ showToast }: { showToast: (m: string) =
                  <div className="text-center"><FileIcon ext={preview.ext} size={48} /><div className="mt-3 text-[13px]" style={{ color: "var(--text-2)" }}>此格式暂不支持在线预览</div><button className="btn btn-primary mt-3" onClick={() => doOpen(preview)}><ExternalLink size={13} /> 用系统程序打开</button></div>
                ) : previewData.error ? (
                  <div className="text-[12px]" style={{ color: "var(--red)" }}>{previewData.error}</div>
+               ) : previewData.kind === "html" ? (
+                 <div className="w-full h-full overflow-auto rounded-lg border" style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+                   dangerouslySetInnerHTML={{ __html: previewData.data || "" }} />
                ) : previewData.kind === "base64" && previewData.mime.startsWith("image/") ? (
                  previewImageUrl ? <img src={previewImageUrl} alt={preview.name} className="max-w-full max-h-full object-contain" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} /> :
                  <div className="text-center"><ImageIcon size={48} style={{ color: "var(--green)" }} /><div className="mt-3 text-[13px]" style={{ color: "var(--text-2)" }}>图片加载失败</div><button className="btn btn-primary mt-3" onClick={() => doOpen(preview)}><ExternalLink size={13} /> 用系统程序打开</button></div>
