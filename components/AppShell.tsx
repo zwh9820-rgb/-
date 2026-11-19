@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import {
   Globe2, Map as MapIcon, ShoppingBag, Warehouse, Ship, BarChart3,
@@ -107,7 +107,8 @@ function ViewLoading() {
 }
 
 export default function AppShell({ theme, setTheme }: { theme: ThemeMode; setTheme: (t: ThemeMode) => void }) {
-  const [module, setModule] = useState<ModuleKey>("globe");
+  // 首屏默认轻量驾驶舱，重型 3D 地球改为按需加载，避免首屏卡顿
+  const [module, setModule] = useState<ModuleKey>("dashboard");
   const [collapsed, setCollapsed] = useState(false);
   const [online, setOnline] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -139,11 +140,21 @@ export default function AppShell({ theme, setTheme }: { theme: ThemeMode; setThe
     return () => { window.removeEventListener("online", onOnline); window.removeEventListener("offline", onOffline); };
   }, []);
 
-  const sync = () => {
+  // 用 ref 保存 timer，卸载时清理，避免无效 setState
+  const timersRef = useRef<number[]>([]);
+  useEffect(() => () => { timersRef.current.forEach((t) => clearTimeout(t)); }, []);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    const t = window.setTimeout(() => setToast(null), 2800);
+    timersRef.current.push(t);
+  }, []);
+
+  const sync = useCallback(() => {
     if (!online || syncing) return;
     setSyncing(true);
     // 真实动作：从 localStorage 重新读取所有本地实体，校验并刷新内存视图
-    setTimeout(() => {
+    const t = window.setTimeout(() => {
       let count = 0;
       ["cbh_data_warehouses_v1", "cbh_data_orders_v1", "cbh_data_skus_v1", "cbh_data_inventory_v1", "cbh_data_containers_v1", "cbh_data_pricecards_v1", "cbh_data_alerts_v1", "cbh_api_configs_v1"].forEach((k) => {
         if (localStorage.getItem(k) && (JSON.parse(localStorage.getItem(k) || "[]") as any[]).length > 0) count++;
@@ -153,19 +164,18 @@ export default function AppShell({ theme, setTheme }: { theme: ThemeMode; setThe
       setLastSync(`${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}`);
       showToast(count > 0 ? `本地数据校验完成，已重新载入 ${count} 类配置` : "已是最新状态，暂无本地配置需同步");
     }, 900);
-  };
+    timersRef.current.push(t);
+  }, [online, syncing, showToast]);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2800);
-  };
-
-  const goto = (key: ModuleKey) => { setModule(key); setMobileNav(false); };
+  const goto = useCallback((key: ModuleKey) => { setModule(key); setMobileNav(false); }, []);
+  const gotoMap = useCallback(() => goto("map"), [goto]);
+  const gotoData = useCallback(() => goto("datacenter"), [goto]);
+  const closeSettingsTab = useCallback(() => setSettingsTab("api"), []);
 
   const renderView = () => {
     switch (module) {
       case "dashboard": return <DashboardView onNavigate={goto} />;
-      case "globe": return <GlobeView onEnterMap={() => goto("map")} onGoData={() => goto("datacenter")} />;
+      case "globe": return <GlobeView onEnterMap={gotoMap} onGoData={gotoData} />;
       case "map": return <MapWorkbench onNavigate={goto} />;
       case "profit": return <ProfitView onNavigate={goto} showToast={showToast} />;
       case "turnover": return <TurnoverView onNavigate={goto} showToast={showToast} />;
@@ -179,7 +189,7 @@ export default function AppShell({ theme, setTheme }: { theme: ThemeMode; setThe
       case "alerts": return <AlertsView onNavigate={goto} />;
       case "datacenter": return <DataCenterView showToast={showToast} onNavigate={goto} />;
       case "fileCenter": return <FileCenterView showToast={showToast} />;
-      case "settings": return <SettingsView theme={theme} setTheme={setTheme} showToast={showToast} initialTab={settingsTab} onTabConsumed={() => setSettingsTab("api")} />;
+      case "settings": return <SettingsView theme={theme} setTheme={setTheme} showToast={showToast} initialTab={settingsTab} onTabConsumed={closeSettingsTab} />;
     }
   };
 
