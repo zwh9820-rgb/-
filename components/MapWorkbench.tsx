@@ -853,7 +853,8 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
       map.addLayer({ id: "delivery-line", type: "line", source: "delivery-line", paint: { "line-color": "#22c55e", "line-width": 2.5, "line-dasharray": [1, 1] } });
     }
     const html = p.type === "warehouse" ? popupWh(p) : p.type === "port" ? popupPort(p) : popupOrder(p, nearest, detailFields);
-    const popup = new maplibregl.Popup({ closeButton: true, maxWidth: "280px", offset: 12 }).setLngLat(p.lngLat as [number, number]).setHTML(html).addTo(map);
+    // closeOnClick:false —— 禁止"点地图空白处关闭"，否则只关 DOM 不清 state 会残留；统一走 X 按钮（下方绑定了清 state）
+    const popup = new maplibregl.Popup({ closeButton: true, closeOnClick: false, maxWidth: "280px", offset: 12 }).setLngLat(p.lngLat as [number, number]).setHTML(html).addTo(map);
     // 关键：Popup 自带 X 关闭只移除 DOM，不清 React 的 selectedFeature；
     // 状态残留会导致下次任意渲染又把弹窗重建（"点了关闭/返回后它还留在那里"）。
     // 直接给 X 按钮绑定点击，同步清除状态与配送线（不依赖 popup close 事件，避免程序性 remove 误触发）。
@@ -904,13 +905,19 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
   const measureDist = measurePts.length >= 2 ? measurePts.slice(1).reduce((s, p, i) => s + DIST(measurePts[i], p), 0) : 0;
   // 城市层订单明细：在标题里带上完整下钻位置（国家/州/城市），避免用户困惑"为什么突然出现订单、是不是别的地方的"
   const drillLocation = path.length ? path.map((n) => n.label).join(" › ") : "全球";
-  const levelTitle = !rankLevel ? `${drillLocation} · 订单明细`
+  // 显式的"订单明细模式"：只有当 path 末端确实是城市层时才为 true。
+  // 不再仅依赖派生的 rankLevel——返回上级/切月份/切底图等任意时序下，只要 path 末端不是 city，
+  // 就一定显示排行榜，杜绝"返回后订单卡片残留、与州卡片混在一起"。
+  const lastLevel = path.length ? path[path.length - 1].level : null;
+  const showOrderList = lastLevel === "city";
+  // 排行榜展示的是"下一级"维度，标题跟随 rankLevel（下一级），而非 path 末端层级。
+  const levelTitle = showOrderList ? `${drillLocation} · 订单明细`
     : rankLevel === "country" ? "国家 / 地区" : rankLevel === "state" ? "州 / 省" : "城市";
   const activeMetric = METRICS.find((m) => m.key === metric)!;
-  // 城市层：展开订单明细
-  const cityOrders = useMemo(() => rankLevel === null
+  // 城市层：展开订单明细（严格按 path 末端判断，返回上级后立即清空）
+  const cityOrders = useMemo(() => showOrderList
     ? [...pathOrders].sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
-    : [], [rankLevel, pathOrders]);
+    : [], [showOrderList, pathOrders]);
 
   return (
     <div className="relative w-full h-full flex overflow-hidden">
@@ -963,16 +970,16 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
           </div>
         </div>
 
-        {/* 排行榜 / 订单明细 */}
+        {/* 排行榜 / 订单明细：由 showOrderList 显式驱动，返回上级立即切回排行榜，杜绝残留 */}
         <div className="flex-1 overflow-y-auto p-2">
-          {rankLevel ? (
+          {!showOrderList ? (
             <>
               <div className="px-1.5 py-1.5 flex items-center justify-between">
                 <span className="text-[10.5px]" style={{ color: "var(--text-3)" }}>{levelTitle} · 按{activeMetric.label}排序</span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "color-mix(in srgb, var(--brand) 12%, transparent)", color: "var(--brand)" }}>点击下钻 ↓</span>
               </div>
               {filteredRanks.map((d, i) => (
-                <button key={d.key} onClick={() => selectRegion(rankLevel, d.key, d.label, d.center, d.orders)}
+                <button key={d.key} onClick={() => selectRegion(rankLevel!, d.key, d.label, d.center, d.orders)}
                   className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left"
                   style={{ background: selectedKey === d.key ? "color-mix(in srgb, var(--brand) 10%, transparent)" : "transparent" }}
                   onMouseEnter={(e) => { if (selectedKey !== d.key) e.currentTarget.style.background = "var(--surface-2)"; }}
