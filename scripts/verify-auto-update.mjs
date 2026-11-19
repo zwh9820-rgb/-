@@ -9,6 +9,7 @@ import path from "node:path";
 import http from "node:http";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
+const PKG_VERSION = JSON.parse(fs.readFileSync(path.resolve("package.json"),"utf8")).version;
 
 let pass = 0, fail = 0;
 const check = (n, ok, d) => { console.log(`${ok ? "✓" : "✗"} ${n}${d ? " — " + d : ""}`); ok ? pass++ : fail++; };
@@ -36,7 +37,7 @@ const Module = require("module");
 const origLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === "electron") return {
-    app: { getVersion: () => "0.1.0", getPath: () => tmpUserData, isPackaged: true },
+    app: { getVersion: () => PKG_VERSION, getPath: () => tmpUserData, isPackaged: true },
     ipcMain: { handle: (name, fn) => { handlers[name] = fn; } },
     BrowserWindow: { getAllWindows: () => [] },
     dialog: {},
@@ -67,7 +68,7 @@ check("IPC handler 全部注册", expectedHandlers.every((h) => typeof handlers[
 
 // get-info
 const info = await handlers["updater:get-info"]();
-check("get-info 返回版本", info.version === "0.1.0" && info.packaged === true);
+check("get-info 返回版本", info.version === PKG_VERSION && info.packaged === true);
 
 // autoDownload/autoInstall 关闭（保护用户不被打断）
 check("autoDownload 已关闭", mockAutoUpdater.autoDownload === false);
