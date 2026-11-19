@@ -16,6 +16,8 @@ $FILES = @(
     "components/views/ReportsView.tsx",
     "app/layout.tsx",
     "package.json",
+    "package-lock.json",
+    "在线更新使用说明.md",
     "lib/import-mapper.ts",
     "scripts/verify-status-import.mjs",
     "scripts/verify-sku-import.mjs",
