@@ -7,12 +7,16 @@
 $ErrorActionPreference = "Stop"
 $OWNER = "zwh9820-rgb"
 $REPO  = "-"
-$TAG   = "v0.1.0"
-$TITLE = "Cross-border Data Hub v0.1.0"
-$NOTES = "First release: cross-border order / overseas warehouse / shipping / price-card dashboard, with in-app auto-update. Installer: cross-border-data-hub-setup-0.1.0.exe (auto-update enabled). Keep latest.yml as the update manifest."
+
+# Read version from package.json so the script never goes stale
+$pkgPath = Join-Path (Get-Location) "package.json"
+$VERSION = (Get-Content $pkgPath -Raw | ConvertFrom-Json).version
+$TAG   = "v$VERSION"
+$TITLE = "LinkVue $VERSION"
+$NOTES = "LinkVue - Cross-border ecommerce visual data hub. Auto-update enabled. Installer: cross-border-data-hub-setup-$VERSION.exe. Keep latest.yml as the update manifest."
 
 $RELEASE_DIR = Join-Path (Get-Location) "dist\github-release"
-$SETUP = Join-Path $RELEASE_DIR "cross-border-data-hub-setup-0.1.0.exe"
+$SETUP = Join-Path $RELEASE_DIR "cross-border-data-hub-setup-$VERSION.exe"
 $YML   = Join-Path $RELEASE_DIR "latest.yml"
 
 foreach ($f in @($SETUP, $YML)) {
