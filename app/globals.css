@@ -1,0 +1,119 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-2: #f1f3f7;
+  --border: #e8ebf0;
+  --text: #1a2233;
+  --text-2: #5b667a;
+  --text-3: #97a1b3;
+  --brand: #3366ff;
+  --green: #16a34a;
+  --amber: #f59e0b;
+  --red: #ef4444;
+}
+
+.dark {
+  --bg: #0d1117;
+  --surface: #151b24;
+  --surface-2: #1c2430;
+  --border: #263040;
+  --text: #e6edf5;
+  --text-2: #9aa8bb;
+  --text-3: #66748a;
+  --brand: #5b8cff;
+  --green: #22c55e;
+  --amber: #fbbf24;
+  --red: #f87171;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+@layer components {
+  .surface { background: var(--surface); }
+  .surface-2 { background: var(--surface-2); }
+  .border-app { border-color: var(--border); }
+  .text-app { color: var(--text); }
+  .text-muted { color: var(--text-2); }
+  .text-dim { color: var(--text-3); }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.03), 0 8px 24px rgba(16,24,40,.04);
+  }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 34px; padding: 0 13px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    cursor: pointer; transition: all .15s ease; white-space: nowrap;
+  }
+  .btn:hover { background: var(--surface-2); border-color: var(--text-3); }
+  .btn-primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn-primary:hover { filter: brightness(1.08); background: var(--brand); border-color: var(--brand); }
+  .field {
+    height: 34px; padding: 0 11px; border-radius: 8px; font-size: 13px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    outline: none; transition: border-color .15s;
+  }
+  .field:focus { border-color: var(--brand); }
+  select.field { cursor: pointer; }
+  .tag {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+    border-radius: 6px; font-size: 11px; font-weight: 600;
+  }
+  .table-wrap { width: 100%; overflow: auto; }
+  table.data { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.data th {
+    text-align: left; padding: 10px 12px; font-weight: 600; color: var(--text-2);
+    background: var(--surface-2); white-space: nowrap; position: sticky; top: 0; z-index: 2;
+  }
+  table.data td { padding: 10px 12px; border-top: 1px solid var(--border); white-space: nowrap; }
+  table.data tbody tr:hover { background: var(--surface-2); }
+  .skeleton { background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  @keyframes pulse-ring { 0% { transform: scale(.7); opacity: .8; } 100% { transform: scale(2.2); opacity: 0; } }
+  .pulse-ring { animation: pulse-ring 2s cubic-bezier(.2,.7,.4,1) infinite; }
+}
+
+/* MapLibre 弹窗适配暗色 */
+.maplibregl-popup-content {
+  background: var(--surface) !important; color: var(--text) !important;
+  border-radius: 12px !important; padding: 0 !important; box-shadow: 0 12px 40px rgba(0,0,0,.18) !important;
+  border: 1px solid var(--border) !important; overflow: hidden;
+}
+.maplibregl-popup-tip { border-top-color: var(--surface) !important; border-bottom-color: var(--surface) !important; }
+.maplibregl-popup-close-button { color: var(--text-2) !important; font-size: 20px !important; padding: 4px 8px !important; }
+.maplibregl-ctrl-group { background: var(--surface) !important; border: 1px solid var(--border) !important; }
+.maplibregl-ctrl-group button { background: var(--surface) !important; }
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: var(--text-3) none; opacity: .6; }
+.maplibregl-ctrl-attrib { background: var(--surface) !important; color: var(--text-3) !important; }
+.maplibregl-ctrl-attrib a { color: var(--text-3) !important; }
+
+/* 分级染色数字标签 */
+.choro-label {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 18px; padding: 0 5px;
+  font-size: 10.5px; font-weight: 700; line-height: 1;
+  color: #fff; background: rgba(15,23,42,.72);
+  border: 1px solid rgba(255,255,255,.45); border-radius: 9px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.3); white-space: nowrap;
+  pointer-events: none; user-select: none;
+}
+.choro-label:hover { background: rgba(37,99,235,.92); }

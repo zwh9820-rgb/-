@@ -1,0 +1,33 @@
+# 依赖
+node_modules/
+
+# 构建产物（安装包走 GitHub Releases，不进源码仓库）
+dist/
+dist_*/
+out/
+.next/
+
+# 本地截图与调试产物
+screenshots/
+*.tsbuildinfo
+.tmp-*/
+scripts/.tmp-*/
+scripts/*.json.tmp
+
+# 一次性调试/诊断脚本与学习数据（非运行必需）
+scripts/debug-*.mjs
+scripts/inspect*.mjs
+scripts/diagnose-*.mjs
+scripts/map-debug.mjs
+scripts/map-verify.mjs
+scripts/gen-icon.cjs
+scripts/gen-zip.mjs
+scripts/zip3-learned.json
+
+# 个人工作记录
+.workbuddy/
+
+# 系统/编辑器
+.DS_Store
+Thumbs.db
+*.log

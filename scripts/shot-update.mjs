@@ -1,0 +1,13 @@
+import puppeteer from "puppeteer-core";
+import http from "node:http"; import fs from "node:fs"; import path from "node:path";
+const ROOT=path.resolve("out"); const M={".html":"text/html",".js":"text/javascript",".css":"text/css",".json":"application/json",".png":"image/png",".jpg":"image/jpeg",".svg":"image/svg+xml",".woff2":"font/woff2"};
+const s=http.createServer((q,r)=>{let p=decodeURIComponent(q.url.split("?")[0]);if(p==="/")p="/index.html";const f=path.join(ROOT,p);fs.readFile(f,(e,d)=>{if(e){r.writeHead(404);r.end();}else{r.writeHead(200,{"Content-Type":M[path.extname(f)]||"application/octet-stream"});r.end(d);}})});
+await new Promise(r=>s.listen(0,"127.0.0.1",r));const port=s.address().port;
+const b=await puppeteer.launch({executablePath:"C:/Program Files/Google/Chrome/Application/chrome.exe",headless:"new",args:["--no-sandbox","--use-gl=swiftshader"]});
+const p=await b.newPage(); await p.setViewport({width:1600,height:1000}); const sl=ms=>new Promise(r=>setTimeout(r,ms));
+await p.goto(`http://127.0.0.1:${port}/`,{waitUntil:"domcontentloaded"});await sl(1500);
+await p.evaluate(()=>[...document.querySelectorAll("nav button")].find(x=>(x.textContent||"").includes("设置"))?.click());await sl(900);
+await p.evaluate(()=>{const b=[...document.querySelectorAll("button")].find(x=>(x.textContent||"").trim()==="在线更新");if(b)b.click()});await sl(700);
+await p.screenshot({path:"D:/work bu/GOZWENJIAN/2026-11-17-14-53-10/screenshots/auto-update-settings.png"});
+console.log("截图完成");
+await b.close();s.close();
