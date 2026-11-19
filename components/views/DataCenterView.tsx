@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import {
   Database, Plus, Pencil, Trash2, Upload, Download, X, Search,
   CheckCircle2, AlertTriangle, FileSpreadsheet, Info, RotateCcw, Sparkles, FlaskConical,
@@ -49,6 +49,14 @@ export default function DataCenterView({
         return Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(kw));
       })
     : records;
+
+  // 分页：避免上千行一次性挂载 DOM 导致卡顿；切标签/搜索时回到第一页
+  const PAGE_SIZE = 50;
+  const [page, setPage] = useState(0);
+  useEffect(() => { setPage(0); }, [active, q]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageRows = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
   const openNew = () => {
     const defaults: Record<string, any> = {};
@@ -299,9 +307,9 @@ export default function DataCenterView({
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((r, idx) => (
-                    <tr key={r.id ?? idx} className="border-b hover:opacity-80" style={{ borderColor: "var(--border)" }}>
-                      <td className="py-2 pr-3" style={{ color: "var(--text-3)" }}>{idx + 1}</td>
+                  {pageRows.map((r, idx) => (
+                    <tr key={`${r.id ?? "row"}-${idx}`} className="border-b hover:opacity-80" style={{ borderColor: "var(--border)" }}>
+                      <td className="py-2 pr-3" style={{ color: "var(--text-3)" }}>{safePage * PAGE_SIZE + idx + 1}</td>
                       {schema.fields.slice(0, 6).map((f) => (
                         <td key={f.key} className="py-2 pr-3 whitespace-nowrap max-w-[180px] truncate">{String(r[f.key] ?? "—")}</td>
                       ))}
@@ -315,8 +323,16 @@ export default function DataCenterView({
               </table>
             </div>
             <div className="flex items-center justify-between mt-3 text-[10.5px]" style={{ color: "var(--text-3)" }}>
-              <span>显示 {filtered.length} / {records.length} 条</span>
-              <button className="flex items-center gap-1 hover:underline" onClick={clearAll}><RotateCcw size={11} /> 清空全部</button>
+              <span>显示 {filtered.length} / {records.length} 条{filtered.length > PAGE_SIZE ? `（第 ${safePage + 1}/${pageCount} 页）` : ""}</span>
+              <div className="flex items-center gap-2">
+                {filtered.length > PAGE_SIZE && (
+                  <div className="flex items-center gap-1">
+                    <button className="px-2 py-1 rounded" style={{ background: "var(--surface-2)" }} disabled={safePage === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>上一页</button>
+                    <button className="px-2 py-1 rounded" style={{ background: "var(--surface-2)" }} disabled={safePage >= pageCount - 1} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}>下一页</button>
+                  </div>
+                )}
+                <button className="flex items-center gap-1 hover:underline" onClick={clearAll}><RotateCcw size={11} /> 清空全部</button>
+              </div>
             </div>
           </>
         )}
