@@ -40,6 +40,7 @@ $FILES = @(
     "scripts/verify-office-preview-e2e.mjs",
     "scripts/verify-antimeridian.mjs",
     "scripts/verify-map-click.mjs",
+    "scripts/verify-top-heat.mjs",
     "scripts/repro-image-text-preview.mjs",
     "scripts/verify-changelog.mjs",
     "scripts/verify-data-doctor.mjs",
