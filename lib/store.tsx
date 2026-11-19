@@ -25,7 +25,31 @@ const LS = {
   alertRead: "cbh_alert_read_v1",
   costRates: "cbh_cost_rates_v1",
   targets: "cbh_targets_v1",
+  fileRoots: "cbh_file_roots_v1",
+  filePrefs: "cbh_file_prefs_v1",
+  fileSettings: "cbh_file_settings_v1",
 } as const;
+
+// ============ 文件中心类型 ============
+export type FileRoot = {
+  id: string;
+  label: string;      // 备注名，如"产品说明书（网盘同步）"
+  path: string;       // 本地绝对路径（网盘同步目录或本地硬盘目录）
+  kind: "network" | "local"; // 网盘同步目录 / 本地目录
+  enabled: boolean;
+};
+export type FilePref = {
+  path: string;       // 文件路径（唯一键）
+  fav: boolean;       // 收藏
+  category?: string;  // 自定义分类
+  downloadable?: boolean; // 是否允许下载（管理员控制），undefined=跟随全局默认
+  viewable?: boolean;     // 是否允许预览（管理员控制），undefined=跟随全局默认
+};
+export type FileCenterSettings = {
+  adminMode: boolean;          // 是否启用管理员权限控制
+  defaultDownloadable: boolean; // 未单独设置时是否允许下载
+  defaultViewable: boolean;     // 未单独设置时是否允许预览
+};
 
 // ============ 扩展实体类型 ============
 export interface InventorySnapshot {
@@ -252,6 +276,10 @@ interface StoreValue {
   alertRead: Record<string, boolean>; setAlertRead: (id: string, read: boolean) => void;
   costRates: CostRates; setCostRates: (r: CostRates) => void;
   targets: Targets; setTarget: (month: string, value: number) => void; deleteTarget: (month: string) => void;
+  // 文件中心
+  fileRoots: FileRoot[]; setFileRoots: (v: FileRoot[] | ((p: FileRoot[]) => FileRoot[])) => void;
+  filePrefs: FilePref[]; setFilePrefs: (v: FilePref[] | ((p: FilePref[]) => FilePref[])) => void;
+  fileSettings: FileCenterSettings; setFileSettings: (v: FileCenterSettings) => void;
 }
 const StoreContext = createContext<StoreValue | null>(null);
 
@@ -304,6 +332,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [targets, setTargetsState] = useState<Targets>(() =>
     typeof window === "undefined" ? {} : readLS(LS.targets, {})
   );
+  // 文件中心
+  const [fileRoots, setFileRoots] = usePersistedCollection<FileRoot>(LS.fileRoots);
+  const [filePrefs, setFilePrefs] = usePersistedCollection<FilePref>(LS.filePrefs);
+  const DEFAULT_FILE_SETTINGS: FileCenterSettings = { adminMode: false, defaultDownloadable: true, defaultViewable: true };
+  const [fileSettings, setFileSettingsState] = useState<FileCenterSettings>(() =>
+    typeof window === "undefined" ? DEFAULT_FILE_SETTINGS : readLS(LS.fileSettings, DEFAULT_FILE_SETTINGS)
+  );
+  const setFileSettings = useCallback((v: FileCenterSettings) => {
+    setFileSettingsState(v);
+    writeLS(LS.fileSettings, v);
+  }, []);
   const [plainSecrets, setPlainSecrets] = useState<Record<string, { appKey: string; appSecret: string }>>({});
 
   useEffect(() => {
@@ -387,6 +426,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     tasks, upsertTask, deleteTask,     geoLayers, addGeoLayer, toggleGeoLayer, deleteGeoLayer,
     alertRead, setAlertRead,
     costRates, setCostRates, targets, setTarget, deleteTarget,
+    fileRoots, setFileRoots, filePrefs, setFilePrefs, fileSettings, setFileSettings,
   }), [warehouses, orders, skus, inventory, containers, priceCards, alerts,
     upsertRecord, deleteRecord, clearEntity, upsertWarehouse, deleteWarehouse,
     apiConfigs, saveApiConfig, deleteApiConfig, thresholds, setThresholds, syncInterval, setSyncInterval, plainSecrets,
@@ -394,7 +434,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     cardVersions, addCardVersion, solutions, addSolution, tasks, upsertTask, deleteTask,
     geoLayers, addGeoLayer, toggleGeoLayer, deleteGeoLayer, alertRead, setAlertRead,
     costRates, setCostRates, targets, setTarget, deleteTarget,
-    setWarehouses, setOrders, setSkus, setInventory, setContainers, setPriceCards, setAlerts]);
+    setWarehouses, setOrders, setSkus, setInventory, setContainers, setPriceCards, setAlerts,
+    fileRoots, setFileRoots, filePrefs, setFilePrefs, fileSettings, setFileSettings]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
