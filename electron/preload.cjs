@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld("fileAPI", {
   scan: (roots) => ipcRenderer.invoke("file:scan", roots),
   listDir: (dir, roots) => ipcRenderer.invoke("file:list-dir", dir, roots),
   read: (filePath, roots) => ipcRenderer.invoke("file:read", filePath, roots),
+  previewPdf: (filePath, roots, name) => ipcRenderer.invoke("file:preview-pdf", filePath, roots, name),
   open: (filePath, roots) => ipcRenderer.invoke("file:open", filePath, roots),
   reveal: (filePath, roots) => ipcRenderer.invoke("file:reveal", filePath, roots),
   saveAs: (filePath, roots) => ipcRenderer.invoke("file:save-as", filePath, roots),
