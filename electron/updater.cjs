@@ -10,8 +10,8 @@ const BACKUP_DIR = () => path.join(app.getPath("userData"), "data-backups");
 
 const DEFAULT_CONFIG = {
   provider: "github",
-  owner: "",
-  repo: "",
+  owner: "zwh9820-rgb",
+  repo: "-",
   private: false,
   token: "",
   // 自建/本地更新源（可选）。填写后用 generic provider 覆盖 GitHub。
@@ -23,7 +23,10 @@ const DEFAULT_CONFIG = {
 function readConfig() {
   try {
     const raw = fs.readFileSync(CONFIG_FILE(), "utf8");
-    return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+    const cfg = { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+    // 旧版本保存过空 owner/repo 时，自动回填预置的官方更新源
+    if (!cfg.owner && !cfg.repo && !cfg.feedUrl) { cfg.owner = DEFAULT_CONFIG.owner; cfg.repo = DEFAULT_CONFIG.repo; }
+    return cfg;
   } catch {
     return { ...DEFAULT_CONFIG };
   }
