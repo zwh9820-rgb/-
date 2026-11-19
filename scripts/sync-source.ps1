@@ -28,6 +28,7 @@ $FILES = @(
     "scripts/dump-userdata2.mjs",
     "scripts/debug-rebrand.mjs",
     "scripts/upload-release.ps1",
+    "scripts/prepare-github-release.mjs",
     "scripts/sync-source.ps1",
     "README.md",
     ".gitignore"
