@@ -1,7 +1,7 @@
 // 文件中心主进程能力：选目录、递归扫描、读取预览、打开文件/所在文件夹。
 // 安全约束：所有读取/打开操作必须落在已登记的根目录内（roots 由渲染层从持久化配置传入），
 // 防止借此访问系统任意文件。
-const { ipcMain, dialog, shell } = require("electron");
+const { ipcMain, dialog, shell, BrowserWindow } = require("electron");
 const fs = require("fs");
 const fsp = fs.promises;
 const path = require("path");
@@ -136,6 +136,22 @@ function registerFileCenterIPC() {
       // 其他类型（Word/Excel/PPT/压缩包等）不支持内嵌预览，提示用系统程序打开
       return { error: "UNPREVIEWABLE" };
     } catch (e) { return { error: "读取失败：" + String(e) }; }
+  });
+
+  // PDF 在线预览：data: URL 在 Electron/Chromium 中无法启动内置 PDF 查看器（会白屏），
+  // 因此用独立窗口 loadFile 加载本地文件，交给 Electron 内置 PDF 查看器渲染。
+  ipcMain.handle("file:preview-pdf", async (_e, filePath, roots, displayName) => {
+    if (!checkAllowed(filePath, roots)) return { ok: false, error: "路径不在已配置的目录内" };
+    try {
+      const win = new BrowserWindow({
+        width: 1040, height: 820,
+        title: displayName || path.basename(filePath),
+        backgroundColor: "#1e1e1e",
+        webPreferences: { nodeIntegration: false, contextIsolation: true, plugins: true },
+      });
+      await win.loadFile(filePath);
+      return { ok: true };
+    } catch (e) { return { ok: false, error: "PDF 预览失败：" + String(e) }; }
   });
 
   // 用系统默认程序打开文件
