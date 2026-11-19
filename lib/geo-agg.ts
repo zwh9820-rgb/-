@@ -144,3 +144,68 @@ export function colorForValue(v: number): string {
   for (const s of CHOROPLETH_STEPS) if (v <= s.max) return s.color;
   return CHOROPLETH_STEPS[CHOROPLETH_STEPS.length - 1].color;
 }
+
+// ============ 反经线（±180°）切分 ============
+// 某些国家（俄罗斯/斐济/南极洲）的 GeoJSON 环跨越 ±180°，相邻顶点经度差接近 360°。
+// Web Mercator 会把这种跳变当作横贯全球的直线，渲染出横穿地图的色带/楔形。
+// 这里在跳变处补 ±180° 边界点并把环切成多段，每段各自闭合，消除横贯线。
+type Position = [number, number];
+type Ring = Position[];
+
+function splitRing(ring: Ring): Ring[] {
+  if (ring.length < 3) return [ring];
+  const out: Ring[] = [];
+  let current: Ring = [ring[0]];
+  for (let i = 1; i < ring.length; i++) {
+    const prev = ring[i - 1];
+    const cur = ring[i];
+    if (Math.abs(cur[0] - prev[0]) > 180) {
+      // 跨反经线：prev 在一侧边界、cur 在另一侧。在两侧边界各补一个纬度插值点，
+      // 把环切成两段分别闭合，避免出现横贯全球的连接线。
+      const eastward = cur[0] < 0 && prev[0] > 0; // 东行 +180 → -180
+      const edgePrev = eastward ? 180 : -180;
+      const edgeCur = eastward ? -180 : 180;
+      // 环绕最短路径上的经度跨度，用于线性插值边界纬度
+      const span = eastward ? (cur[0] + 360) - prev[0] : cur[0] - (prev[0] - 360);
+      const t = Math.min(1, Math.max(0, Math.abs(edgePrev - prev[0]) / (Math.abs(span) || 1)));
+      const latAtEdge = prev[1] + (cur[1] - prev[1]) * t;
+      current.push([edgePrev, latAtEdge]);
+      if (current.length >= 3) out.push(current);
+      current = [[edgeCur, latAtEdge], cur];
+    } else {
+      current.push(cur);
+    }
+  }
+  if (current.length >= 3) out.push(current);
+  return out;
+}
+
+/**
+ * 清洗整个 FeatureCollection：把跨 ±180° 的多边形切开，避免地图出现横贯条带。
+ * 只处理 Polygon / MultiPolygon，其余原样保留。
+ */
+export function splitAntimeridian(geo: any): any {
+  if (!geo || !Array.isArray(geo.features)) return geo;
+  const features = geo.features.map((f: any) => {
+    const g = f.geometry;
+    if (!g || (g.type !== "Polygon" && g.type !== "MultiPolygon")) return f;
+    const polys: Ring[][] = g.type === "Polygon" ? [g.coordinates] : g.coordinates;
+    const needSplit = polys.some((poly) => poly.some((ring) => ring.some((p, i) => i > 0 && Math.abs(p[0] - ring[i - 1][0]) > 180)));
+    if (!needSplit) return f;
+    const newPolys: Ring[][] = [];
+    for (const poly of polys) {
+      // 南极洲等极地要素的内环也可能跨 ±180°，因此对每个环都做切分。
+      // 外环切出的每段独立成 polygon；洞若跨经线也切成段，挂到对应的外环切片上。
+      const outer = splitRing(poly[0] || []);
+      const holes: Ring[][] = poly.slice(1).map((h: Ring) => splitRing(h));
+      outer.forEach((r, idx) => {
+        const ringHoles = holes.filter((hs) => hs.length === 1).map((hs) => hs[0]);
+        newPolys.push([r, ...(idx === 0 ? ringHoles : [])]);
+      });
+      // 被切成多段的洞各自补成独立 polygon（避免保留跨经线的洞）
+      holes.filter((hs) => hs.length > 1).forEach((hs) => hs.forEach((h) => newPolys.push([h])));
+    }
+    return { ...f, geometry: { type: "MultiPolygon", coordinates: newPolys } };
+  });
+  return { ...geo, features };
+}
