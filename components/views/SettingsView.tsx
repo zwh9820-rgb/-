@@ -5,11 +5,12 @@ import {
   KeyRound, Globe, BellRing, RefreshCw, Sun, Moon,
   Warehouse, Save, Eye, EyeOff, ShieldCheck, Plus, Edit, Check, Trash2, X,
   Loader2, PlugZap, AlertTriangle, MapPin, Download, Rocket, ExternalLink,
-  CheckCircle2, Circle, HardDriveDownload,
+  CheckCircle2, Circle, HardDriveDownload, FileText, Copy,
 } from "lucide-react";
 import type { ThemeMode, Warehouse as WarehouseType, HealthStatus } from "@/lib/types";
 import { useStore, ApiConfig, DEFAULT_THRESHOLDS } from "@/lib/store";
 import { readFileText } from "@/lib/file-utils";
+import { CHANGELOG, CHANGELOG_POLICY, formatReleaseNotes } from "@/lib/changelog";
 import { PageHeader, Section } from "./shared";
 import clsx from "clsx";
 
@@ -390,6 +391,44 @@ export default function SettingsView({ theme, setTheme, showToast, initialTab, o
               <button className="btn btn-primary !h-9" onClick={doCheck} disabled={upStatus.state === "checking" || upStatus.state === "downloading"}>
                 {upStatus.state === "checking" ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} 检查更新
               </button>
+            </div>
+
+            {/* 版本更新说明：与 GitHub Release 同源 */}
+            <div className="p-4 rounded-xl" style={{ background: "var(--surface-2)" }}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 text-[12.5px] font-semibold"><FileText size={14} style={{ color: "var(--brand)" }} /> 版本更新说明</div>
+                <a href="https://github.com/zwh9820-rgb/-/releases" target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[11px]" style={{ color: "var(--brand)" }}>在 GitHub 查看 <ExternalLink size={11} /></a>
+              </div>
+              <div className="text-[10.5px] mb-3 leading-relaxed" style={{ color: "var(--text-3)" }}>{CHANGELOG_POLICY}</div>
+              <div className="space-y-2">
+                {CHANGELOG.map((entry, idx) => (
+                  <details key={entry.version} open={idx === 0} className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)", background: "var(--surface)" }}>
+                    <summary className="flex items-center gap-2 px-3 py-2.5 cursor-pointer" style={{ listStyle: "none" }}>
+                      <span className="tag shrink-0" style={{ background: idx === 0 ? "var(--brand)" : "var(--border)", color: idx === 0 ? "#fff" : "var(--text-2)" }}>v{entry.version}</span>
+                      <span className="flex-1 min-w-0 text-[12px] font-medium truncate">{entry.title}</span>
+                      <span className="text-[10.5px] shrink-0" style={{ color: "var(--text-3)" }}>{entry.date}</span>
+                    </summary>
+                    <div className="px-3 pb-3 pt-1 space-y-2.5" style={{ borderTop: "1px solid var(--border)" }}>
+                      <div>
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold mt-2.5 mb-1" style={{ color: "var(--red)" }}><AlertTriangle size={12} /> 发现的问题</div>
+                        <ul className="pl-5 space-y-1 text-[11px] leading-relaxed" style={{ color: "var(--text-2)", listStyle: "disc" }}>
+                          {entry.issues.map((s, i) => <li key={i}>{s}</li>)}
+                        </ul>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold mb-1" style={{ color: "var(--green)" }}><CheckCircle2 size={12} /> 解决的问题</div>
+                        <ul className="pl-5 space-y-1 text-[11px] leading-relaxed" style={{ color: "var(--text-2)", listStyle: "disc" }}>
+                          {entry.fixes.map((s, i) => <li key={i}>{s}</li>)}
+                        </ul>
+                      </div>
+                      <button className="btn !h-7 !text-[10.5px]" onClick={async () => {
+                        try { await navigator.clipboard.writeText(formatReleaseNotes(entry)); showToast(`已复制 v${entry.version} 更新说明`); }
+                        catch { showToast("复制失败，可手动选中文字复制"); }
+                      }}><Copy size={11} /> 复制本版说明</button>
+                    </div>
+                  </details>
+                ))}
+              </div>
             </div>
 
             {/* 状态提示 */}
