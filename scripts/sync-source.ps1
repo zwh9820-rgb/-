@@ -8,7 +8,11 @@ $BRANCH = "master"
 # Files that changed since the initial commit
 $FILES = @(
     "electron/updater.cjs",
+    "lib/store.tsx",
+    "components/GlobeView.tsx",
     "scripts/verify-auto-update.mjs",
+    "scripts/verify-dirty-data.mjs",
+    "scripts/verify-electron-dirty.mjs",
     "scripts/upload-release.ps1",
     "scripts/sync-source.ps1",
     "README.md",
