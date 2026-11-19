@@ -102,7 +102,7 @@ export default function ReportsView({ showToast }: { showToast: (m: string) => v
     for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(500 - 150, 250 + i * 45); ctx.lineTo(500 + 150, 250 + i * 45); ctx.stroke(); }
     // 仓库点位
     [[450, 180], [560, 210], [480, 300], [600, 280]].forEach(([x, y], i) => { ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2); ctx.fillStyle = ["#22c55e", "#f59e0b", "#22c55e", "#ef4444"][i]; ctx.fill(); });
-    ctx.fillStyle = "#fff"; ctx.font = "bold 28px system-ui"; ctx.fillText("跨境全链路数据中台", 32, 62);
+    ctx.fillStyle = "#fff"; ctx.font = "bold 28px system-ui"; ctx.fillText("LinkVue 联视 · 跨境数据中台", 32, 62);
     ctx.font = "16px system-ui"; ctx.fillText(`地图视图快照 · ${new Date().toLocaleString("zh-CN")}`, 32, 92);
     ctx.font = "14px system-ui"; ctx.fillText(`海外仓 ${reportData.warehouses.length} 个  ·  在途柜 ${reportData.containers.length} 条  ·  订单 ${reportData.orders.length} 单`, 32, 500);
     canvas.toBlob((blob) => {
