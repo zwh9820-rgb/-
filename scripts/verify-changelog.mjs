@@ -9,8 +9,10 @@ const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE; delete env.NODE
 let pass = 0, fail = 0;
 const check = (n, ok, d) => { console.log(`${ok ? "✓" : "✗"} ${n}${d ? " — " + d : ""}`); ok ? pass++ : fail++; };
 
-const data = JSON.parse(fs.readFileSync("changelog.json", "utf8"));
-check("changelog.json 含所有版本", data.versions.length >= 4, `${data.versions.length} 个版本`);
+  const data = JSON.parse(fs.readFileSync("changelog.json", "utf8"));
+  const currentVersion = JSON.parse(fs.readFileSync("package.json", "utf8")).version;
+  check("changelog.json 含所有版本", data.versions.length >= 4, `${data.versions.length} 个版本`);
+  check("changelog 含当前版本", data.versions.some((v) => v.version === currentVersion), `当前 ${currentVersion}`);
 check("每版都有 issues 与 fixes", data.versions.every((v) => v.issues.length && v.fixes.length));
 
 if (!fs.existsSync(ELECTRON)) { check("EXE 存在", false); process.exit(1); }
@@ -35,9 +37,9 @@ try {
   check("显示「版本更新说明」标题", body.includes("版本更新说明"));
   check("显示「发现的问题」", body.includes("发现的问题"));
   check("显示「解决的问题」", body.includes("解决的问题"));
-  check("展示最新版本 v0.1.3", body.includes("v0.1.3"));
+  check(`展示最新版本 v${currentVersion}`, body.includes(`v${currentVersion}`));
   check("展示历史版本 v0.1.1", body.includes("v0.1.1"));
-  const sample = data.versions.find((v) => v.version === "0.1.3").issues[0];
+  const sample = data.versions.find((v) => v.version === currentVersion).issues[0];
   check("说明正文与数据源一致", body.includes(sample.slice(0, 12)), sample.slice(0, 20));
   check("无页面崩溃", !body.includes("Application error"));
   await page.evaluate(() => window.close()); await sleep(1000);
