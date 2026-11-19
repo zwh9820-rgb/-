@@ -112,8 +112,8 @@ try {
   await clickRank("Texas"); await sleep(4000);
   h = await heat();
   check("进入州后层级为 city", h.level === "city", `level=${h.level}`);
-  check("城市 Top N 标注已显示", h.cityMarks >= 3, `marks=${h.cityMarks}`);
-  check("城市标注包含 Houston/Dallas/Austin", h.cities.includes("Houston") && h.cities.includes("Dallas") && h.cities.includes("Austin"), `cities=${h.cities}`);
+  check("地图城市气泡已移除(不再遮挡视野)", h.cityMarks === 0, `marks=${h.cityMarks}`);
+  check("左侧数据看板仍显示城市排名 Houston/Dallas/Austin", h.body.includes("Houston") && h.body.includes("Dallas") && h.body.includes("Austin"));
   await page.screenshot({ path: "D:/work bu/GOZWENJIAN/2026-11-17-14-53-10/screenshots/heat-city.png" });
 
   // 关闭热度 → 标注消失（此时热度面板仍打开）
