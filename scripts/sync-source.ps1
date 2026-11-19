@@ -31,6 +31,7 @@ $FILES = @(
     "README.md",
     ".gitignore",
     "scripts/verify-sample-data.mjs",
+    "scripts/verify-file-center.mjs",
     "scripts/verify-changelog.mjs",
     "scripts/verify-data-doctor.mjs",
     "scripts/verify-single-instance.mjs",
