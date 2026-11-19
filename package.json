@@ -1,6 +1,6 @@
 {
   "name": "cross-border-data-hub",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "description": "LinkVue 联视 - 跨境全链路可视化数据中台 (Windows 桌面应用)",
   "main": "electron/main.cjs",
@@ -76,7 +76,6 @@
   "dependencies": {
     "clsx": "^2.1.1",
     "electron-updater": "^6.3.9",
-    "i18n-iso-countries": "^7.14.0",
     "lucide-react": "^0.475.0",
     "maplibre-gl": "^5.2.0",
     "next": "15.1.6",
