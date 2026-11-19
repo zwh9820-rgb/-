@@ -196,7 +196,7 @@ export default function AppShell({ theme, setTheme }: { theme: ThemeMode; setThe
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <div className="text-[13.5px] font-bold leading-tight truncate">跨境数据中台</div>
+              <div className="text-[13.5px] font-bold leading-tight truncate">LinkVue 联视</div>
               <div className="text-[10.5px] leading-tight truncate" style={{ color: "var(--text-3)" }}>Cross-Border Data Hub</div>
             </div>
           )}
