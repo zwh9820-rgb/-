@@ -20,6 +20,7 @@ $FILES = @(
     "app/layout.tsx",
     "package.json",
     "package-lock.json",
+    "next.config.mjs",
     "在线更新使用说明.md",
     "lib/import-mapper.ts",
     "scripts/verify-status-import.mjs",
