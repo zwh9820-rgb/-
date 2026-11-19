@@ -24,10 +24,19 @@ const yml = fs.readFileSync(latestPath, "utf8");
 const urlMatch = yml.match(/url:\s*(.+)/);
 const referenced = urlMatch ? urlMatch[1].trim() : "cross-border-data-hub-setup-" + pkg.version + ".exe";
 
-// 找中文名安装版 EXE
-const setupExe = fs.readdirSync(DIST).find((f) => /Setup .+\.exe$/i.test(f));
+// 找中文名安装版 EXE；dist 里可能同时存在多个历史版本，必须按目标版本精确匹配
+const setupCandidates = fs.readdirSync(DIST).filter((f) => /Setup .+\.exe$/i.test(f));
+const escapedVersion = requested.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const versionPattern = new RegExp(`Setup\\s+${escapedVersion}\\.exe$`, "i");
+const setupExe =
+  setupCandidates.find((f) => versionPattern.test(f)) ||
+  setupCandidates.sort((a, b) => fs.statSync(path.join(DIST, b)).mtimeMs - fs.statSync(path.join(DIST, a)).mtimeMs)[0];
 if (!setupExe) {
   console.error("✗ 未找到安装版 EXE（形如 *Setup*.exe），请先打包");
+  process.exit(1);
+}
+if (!versionPattern.test(setupExe)) {
+  console.error(`✗ 未找到版本 ${requested} 的安装版，实际找到 ${setupExe}，请先重新打包`);
   process.exit(1);
 }
 
