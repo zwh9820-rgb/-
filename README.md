@@ -74,13 +74,25 @@
 
 程序内置更新源（owner `zwh9820-rgb` / repo `-`），打开即自动检查；也可在 **系统设置 → 在线更新** 或菜单 **帮助 → 检查更新** 手动触发。
 
+### 版本更新说明（每个版本都有）
+
+**每次升级都能看到「发现了什么问题、解决了什么问题」**，两处内容完全一致：
+
+- **应用内**：系统设置 → 在线更新 → 版本更新说明（按版本展开，可复制单版说明）
+- **GitHub**：[Releases 页面](https://github.com/zwh9820-rgb/-/releases) 每个版本的正文
+
+版本规则：每次发布在上一版本后加 `0.0.1`（0.1.0 → 0.1.1 → 0.1.2 → 0.1.3 …）。全部历史记录见项目根目录 `changelog.json`。
+
 <details>
 <summary>发布新版本的操作步骤（维护者）</summary>
 
-1. 改 `package.json` 的 `version`
-2. `npm run desktop:export` → `npx electron-builder --win --x64`
-3. `node scripts/prepare-github-release.mjs <版本号>`
-4. 运行 `scripts/upload-release.ps1`，它读取本机 GitHub 凭据，自动建 Release 并上传安装包 + `latest.yml`
+1. **先在 `changelog.json` 增加该版本条目**，写明 `issues`（发现的问题）与 `fixes`（解决的问题）——这是应用内展示与 GitHub Release 说明的唯一来源
+2. 把 `package.json` 和 `package-lock.json` 的 `version` 按 `0.0.1` 递增
+3. `npm run desktop:export` → `npx electron-builder --win --x64`
+4. `node scripts/prepare-github-release.mjs <版本号>`
+5. 运行 `scripts/upload-release.ps1`，它读取本机 GitHub 凭据，自动用 changelog 生成 Release 说明、建 Release 并上传安装包 + `latest.yml`
+6. 运行 `scripts/sync-source.ps1` 同步源码到 GitHub master
+7. 如需修改已发布版本的说明：改好 `changelog.json` 后运行 `scripts/update-release-notes.ps1 <版本号>`
 
 </details>
 
