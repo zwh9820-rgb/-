@@ -11,7 +11,8 @@ import {
   type EntitySchema, type FieldDef,
 } from "@/lib/data-schema";
 import { readFileText, readXlsx, isExcel } from "@/lib/file-utils";
-import { mapRows, type MappingResult } from "@/lib/import-mapper";
+import { mapRows, detectEntity, type MappingResult } from "@/lib/import-mapper";
+import { diagnoseData } from "@/lib/data-doctor";
 import { PageHeader, Section } from "./shared";
 import SmartImport from "./SmartImport";
 import clsx from "clsx";
@@ -32,6 +33,7 @@ export default function DataCenterView({
   // 导入映射预览
   const [importPreview, setImportPreview] = useState<{
     entity: EntityKey; fileName: string; result: MappingResult; sheets?: string[]; sheet?: string; file?: File;
+    detected?: EntityKey; // 文件真实识别类型，用于防止"在A标签导入B文件"导致的数据错位
   } | null>(null);
 
   const schema = ENTITY_SCHEMAS.find((s) => s.key === active)!;
@@ -95,7 +97,7 @@ export default function DataCenterView({
     showToast(`已导出 ${records.length} 条记录`);
   };
 
-  const parseFile = async (file: File, entity: EntityKey, sheet?: string) => {
+  const parseFile = async (file: File, entity: EntityKey, sheet?: string, userPicked = false) => {
     try {
       let headers: string[], rows: string[][], sheets: string[] | undefined;
       if (isExcel(file)) {
@@ -116,9 +118,20 @@ export default function DataCenterView({
         headers = parsed[0] || []; rows = parsed.slice(1);
       }
       if (!headers.length || !rows.length) { showToast("文件无有效数据行，请检查格式"); return; }
-      const result = mapRows(entity, headers, rows);
+      // 关键修复：以文件真实识别类型为准，避免"在海外仓标签导入订单文件"造成字段错位、数据串到错误集合。
+      // detectEntity 按列名打分，只有确信度足够（最高分明显高于次高）时才纠正；否则尊重用户在下拉框的选择。
+      const guesses = detectEntity(headers);
+      const top = guesses[0];
+      const second = guesses[1];
+      const confident = top && top.score >= 3 && (!second || top.score >= second.score + 2);
+      // userPicked=true 表示用户在预览里明确指定了类型，尊重其选择；否则自动纠正到识别类型
+      const effectiveEntity: EntityKey = (!userPicked && confident) ? top.entity : entity;
+      if (!userPicked && confident && effectiveEntity !== entity) {
+        showToast(`已识别文件为「${ENTITY_SCHEMAS.find((s) => s.key === effectiveEntity)?.label}」，将导入到正确的数据集（而非当前标签）`);
+      }
+      const result = mapRows(effectiveEntity, headers, rows);
       if (!result.records.length) { showToast("未解析到有效数据行"); return; }
-      setImportPreview({ entity, fileName: file.name, result, sheets, sheet, file });
+      setImportPreview({ entity: effectiveEntity, detected: top?.entity, fileName: file.name, result, sheets, sheet, file });
     } catch (err) {
       showToast("文件解析失败：" + (err instanceof Error ? err.message : "格式错误"));
     }
@@ -141,6 +154,16 @@ export default function DataCenterView({
   };
 
   const totalCount = ENTITY_SCHEMAS.reduce((s, sc) => s + ((store[sc.key] as any[])?.length || 0), 0);
+
+  // 数据体检：检测被错导到错误集合的脏数据（如订单数据进了海外仓）
+  const dataIssues = useMemo(() => {
+    const all: Record<EntityKey, any[]> = {
+      warehouses: store.warehouses as any[], orders: store.orders as any[], skus: store.skus as any[],
+      inventory: store.inventory as any[], containers: store.containers as any[],
+      priceCards: store.priceCards as any[], alerts: store.alerts as any[],
+    };
+    return diagnoseData(all);
+  }, [store.warehouses, store.orders, store.skus, store.inventory, store.containers, store.priceCards, store.alerts]);
 
   return (
     <div className="h-full overflow-y-auto p-5 lg:p-6">
@@ -178,6 +201,29 @@ export default function DataCenterView({
           <button className="ml-1 underline" style={{ color: "var(--brand)" }} onClick={() => setSmartOpen(true)}>立即打开 →</button>
         </div>
       </div>
+
+      {/* 数据体检：提示被错导到错误集合的脏数据，支持一键清空后重新导入 */}
+      {dataIssues.map((issue) => {
+        const label = ENTITY_SCHEMAS.find((s) => s.key === issue.entity)?.label || issue.entity;
+        return (
+          <div key={issue.entity} className="mb-3 flex items-start gap-2.5 p-3 rounded-xl text-[11.5px] leading-relaxed" style={{ background: "color-mix(in srgb, var(--red) 8%, transparent)", color: "var(--text-2)", border: `1px solid color-mix(in srgb, var(--red) 25%, transparent)` }}>
+            <AlertTriangle size={16} className="shrink-0 mt-0.5" style={{ color: "var(--red)" }} />
+            <div className="flex-1">
+              <div className="font-semibold" style={{ color: "var(--red)" }}>数据体检发现异常 · {label}</div>
+              <div className="mt-0.5">{issue.reason}。{issue.suggestion}。</div>
+            </div>
+            <div className="flex flex-col gap-1.5 shrink-0">
+              <button className="btn !h-7 !text-[11px]" onClick={() => { setActive(issue.entity); setQ(""); }}>查看{label}</button>
+              <button className="btn !h-7 !text-[11px]" style={{ color: "var(--red)" }} onClick={() => {
+                if (window.confirm(`确定清空全部 ${(store[issue.entity] as any[]).length} 条${label}数据吗？清空后请用「智能导入」重新导入正确类型。`)) {
+                  store.clearEntity(issue.entity);
+                  showToast(`已清空${label}数据，请重新导入`);
+                }
+              }}>清空并重导</button>
+            </div>
+          </div>
+        );
+      })}
 
       <Section
         title={`${schema.icon} ${schema.label}数据`}
@@ -255,7 +301,8 @@ export default function DataCenterView({
       {importPreview && (
         <ImportPreview
           preview={importPreview}
-          onSheet={(s) => { if (importPreview.file) parseFile(importPreview.file, importPreview.entity, s); }}
+          onSheet={(s) => { if (importPreview.file) parseFile(importPreview.file, importPreview.entity, s, true); }}
+          onEntity={(next) => { if (importPreview.file) parseFile(importPreview.file, next, importPreview.sheet, true); }}
           onClose={() => setImportPreview(null)}
           onConfirm={confirmImport}
         />
@@ -314,14 +361,16 @@ function EditModal({ schema, value, onChange, onClose, onSave }: {
   );
 }
 
-function ImportPreview({ preview, onSheet, onClose, onConfirm }: {
-  preview: { entity: EntityKey; fileName: string; result: MappingResult; sheets?: string[]; sheet?: string };
+function ImportPreview({ preview, onSheet, onEntity, onClose, onConfirm }: {
+  preview: { entity: EntityKey; fileName: string; result: MappingResult; sheets?: string[]; sheet?: string; detected?: EntityKey };
   onSheet: (s: string) => void;
+  onEntity: (e: EntityKey) => void;
   onClose: () => void;
   onConfirm: (replace: boolean) => void;
 }) {
-  const { result, sheets, sheet, fileName } = preview;
+  const { result, sheets, sheet, fileName, detected } = preview;
   const entityLabel = ENTITY_SCHEMAS.find((s) => s.key === preview.entity)?.label || preview.entity;
+  const detectedLabel = detected ? (ENTITY_SCHEMAS.find((s) => s.key === detected)?.label || detected) : "";
   const fieldLabels: Record<string, string> = {};
   ENTITY_SCHEMAS.find((s) => s.key === preview.entity)?.fields.forEach((f) => { fieldLabels[f.key] = f.label; });
   const matchedEntries = Object.entries(result.matched);
@@ -331,12 +380,24 @@ function ImportPreview({ preview, onSheet, onClose, onConfirm }: {
       <div className="w-[720px] max-w-full max-h-[90vh] rounded-2xl shadow-2xl flex flex-col" style={{ background: "var(--surface)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
           <div>
-            <h3 className="text-[15px] font-bold flex items-center gap-2"><FileSpreadsheet size={17} style={{ color: "var(--brand)" }} /> 导入预览 · {entityLabel}</h3>
-            <p className="text-[11px] mt-0.5 truncate max-w-[560px]" style={{ color: "var(--text-3)" }}>{fileName} · 解析到 {result.records.length} 条</p>
+            <h3 className="text-[15px] font-bold flex items-center gap-2"><FileSpreadsheet size={17} style={{ color: "var(--brand)" }} /> 导入预览</h3>
+            <p className="text-[11px] mt-0.5 truncate max-w-[460px]" style={{ color: "var(--text-3)" }}>{fileName} · 解析到 {result.records.length} 条</p>
           </div>
-          <button className="p-1.5 rounded-lg" onClick={onClose}><X size={18} /></button>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px]" style={{ color: "var(--text-3)" }}>导入为</span>
+            <select className="field !h-8 !w-32 !text-[11px]" value={preview.entity} onChange={(e) => onEntity(e.target.value as EntityKey)}>
+              {ENTITY_SCHEMAS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+            </select>
+            <button className="p-1.5 rounded-lg" onClick={onClose}><X size={18} /></button>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {detected && detected !== preview.entity && (
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg text-[11.5px]" style={{ background: "color-mix(in srgb, var(--amber) 10%, transparent)", color: "var(--amber)" }}>
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              <span>此文件列名识别为「{detectedLabel}」，当前按「{entityLabel}」导入。若字段对不上，请在上方「导入为」切换到正确类型，避免数据错位。</span>
+            </div>
+          )}
           {/* 工作表切换 */}
           {sheets && sheets.length > 1 && (
             <div className="flex items-center gap-2 flex-wrap">
