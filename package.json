@@ -2,7 +2,7 @@
   "name": "cross-border-data-hub",
   "version": "0.1.0",
   "private": true,
-  "description": "跨境全链路可视化数据中台 - Windows 桌面应用",
+  "description": "LinkVue 联视 - 跨境全链路可视化数据中台 (Windows 桌面应用)",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "next dev -p 3000",
@@ -16,7 +16,7 @@
   },
   "build": {
     "appId": "com.cbh.crossborderhub",
-    "productName": "跨境全链路数据中台",
+    "productName": "LinkVue 联视",
     "copyright": "Copyright © 2026",
     "directories": {
       "output": "dist",
@@ -67,10 +67,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "跨境全链路数据中台"
+      "shortcutName": "LinkVue 联视"
     },
     "portable": {
-      "artifactName": "跨境数据中台-便携版-${version}.exe"
+      "artifactName": "LinkVue联视-便携版-${version}.exe"
     }
   },
   "dependencies": {
