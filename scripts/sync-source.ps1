@@ -5,57 +5,66 @@ $OWNER = "zwh9820-rgb"
 $REPO  = "-"
 $BRANCH = "master"
 
-# Files that changed since the initial commit
+# Source files to sync (core app + official verification suites only)
 $FILES = @(
     "electron/main.cjs",
     "electron/updater.cjs",
     "electron/preload.cjs",
+    "electron/file-center.cjs",
     "changelog.json",
     "lib/changelog.ts",
     "lib/data-doctor.ts",
+    "lib/sample-data.ts",
     "lib/store.tsx",
-    "components/views/DataCenterView.tsx",
-    "components/views/SettingsView.tsx",
-    "components/GlobeView.tsx",
+    "lib/import-mapper.ts",
     "components/AppShell.tsx",
+    "components/views/DataCenterView.tsx",
+    "components/views/FileCenterView.tsx",
+    "components/views/SettingsView.tsx",
     "components/views/ReportsView.tsx",
+    "components/GlobeView.tsx",
     "app/layout.tsx",
     "package.json",
     "package-lock.json",
     "next.config.mjs",
     "在线更新使用说明.md",
-    "lib/import-mapper.ts",
+    "README.md",
+    ".gitignore",
+    "scripts/verify-sample-data.mjs",
     "scripts/verify-changelog.mjs",
     "scripts/verify-data-doctor.mjs",
-    "scripts/diagnose-tab-switch.mjs",
-    "scripts/repro-import-switch.mjs",
-    "scripts/repro-bigdata-switch.mjs",
-    "scripts/repro-electron-switch.mjs",
-    "scripts/diagnose-lag.mjs",
     "scripts/verify-single-instance.mjs",
     "scripts/verify-status-import.mjs",
     "scripts/verify-sku-import.mjs",
-    "scripts/inspect-template.mjs",
-    "scripts/inspect-sku-template.mjs",
-    "scripts/debug-sku-map.mjs",
-    "scripts/debug-sku-mismatch.mjs",
     "scripts/verify-auto-update.mjs",
     "scripts/verify-dirty-data.mjs",
     "scripts/verify-electron-dirty.mjs",
     "scripts/verify-rebrand.mjs",
     "scripts/verify-data-persist.mjs",
     "scripts/verify-electron-e2e.mjs",
-    "scripts/diagnose-clean.mjs",
-    "scripts/diagnose-crash.mjs",
-    "scripts/dump-userdata.mjs",
-    "scripts/dump-userdata2.mjs",
-    "scripts/debug-rebrand.mjs",
     "scripts/upload-release.ps1",
     "scripts/update-release-notes.ps1",
     "scripts/prepare-github-release.mjs",
-    "scripts/sync-source.ps1",
-    "README.md",
-    ".gitignore"
+    "scripts/sync-source.ps1"
+)
+
+# One-off debug/repro scripts left over from earlier versions — remove from the remote repo.
+# These were previously synced by mistake; they are throwaway diagnostics, not part of the app.
+$REMOVE = @(
+    "scripts/diagnose-tab-switch.mjs",
+    "scripts/diagnose-lag.mjs",
+    "scripts/diagnose-clean.mjs",
+    "scripts/diagnose-crash.mjs",
+    "scripts/repro-import-switch.mjs",
+    "scripts/repro-bigdata-switch.mjs",
+    "scripts/repro-electron-switch.mjs",
+    "scripts/inspect-template.mjs",
+    "scripts/inspect-sku-template.mjs",
+    "scripts/debug-sku-map.mjs",
+    "scripts/debug-sku-mismatch.mjs",
+    "scripts/debug-rebrand.mjs",
+    "scripts/dump-userdata.mjs",
+    "scripts/dump-userdata2.mjs"
 )
 
 $TOKEN = $env:GITHUB_TOKEN
@@ -95,6 +104,18 @@ foreach ($rel in $FILES) {
         Write-Host "Synced: $rel" -ForegroundColor Green
     } catch {
         Write-Host "FAILED: $rel — $($_.Exception.Message)" -ForegroundColor Red
+    }
+}
+# Remove stale one-off scripts from remote
+foreach ($rel in $REMOVE) {
+    $url = "$API/contents/$rel"
+    try {
+        $existing = Invoke-RestMethod -Method Get -Uri "$url`?ref=$BRANCH" -Headers $HDR -TimeoutSec 60
+        $delBody = @{ message="Remove leftover debug script: $rel"; sha=$existing.sha; branch=$BRANCH } | ConvertTo-Json -Compress
+        Invoke-RestMethod -Method Delete -Uri $url -Headers $HDR -Body $delBody -ContentType "application/json" -TimeoutSec 120 | Out-Null
+        Write-Host "Removed remote: $rel" -ForegroundColor Yellow
+    } catch {
+        # 404 = already absent, treat as OK
     }
 }
 Write-Host "Done." -ForegroundColor Cyan
