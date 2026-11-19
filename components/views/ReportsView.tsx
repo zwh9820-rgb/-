@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   FileBarChart, FileSpreadsheet, FileText, Download, CalendarClock,
   ShoppingCart as OrdersIcon, Package, ClipboardList, Receipt, CheckCircle2, Clock,
@@ -54,13 +54,15 @@ function buildReport(id: string, range: string, data: ReportData): string[][] {
 
 export default function ReportsView({ showToast }: { showToast: (m: string) => void }) {
   const store = useStore();
-  const reportData: ReportData = {
+  const reportData: ReportData = useMemo(() => ({
     orders: store.orders, inventory: store.inventory, containers: store.containers,
     skus: store.skus, warehouses: store.warehouses, priceCards: store.priceCards,
-  };
+  }), [store.orders, store.inventory, store.containers, store.skus, store.warehouses, store.priceCards]);
   const [selected, setSelected] = useState("order");
   const [format, setFormat] = useState("Excel");
   const [range, setRange] = useState("最近 30 天");
+  // 预估行数缓存：避免在 render 中每次执行 O(n) 的 buildReport
+  const estimatedRecords = useMemo(() => buildReport(selected, range, reportData).length - 1, [selected, range, reportData]);
   const [taskModal, setTaskModal] = useState(false);
   const [newTask, setNewTask] = useState({ name: "", cycle: "每周一 09:00" });
 
@@ -157,7 +159,7 @@ export default function ReportsView({ showToast }: { showToast: (m: string) => v
               <div><label className="block text-[11px] mb-1.5" style={{ color: "var(--text-2)" }}>时间范围</label><select className="field" value={range} onChange={(e) => setRange(e.target.value)}><option>最近 30 天</option><option>最近 90 天</option><option>本年度</option><option>全部</option></select></div>
               <button className="btn btn-primary ml-auto" onClick={() => exportNow(templates.find((t) => t.id === selected)!.name, format)}><Download size={14} /> 立即导出</button>
             </div>
-            <div className="mt-2 text-[10.5px]" style={{ color: "var(--text-3)" }}>已选：{templates.find((t) => t.id === selected)?.name} · {range} · {format} · 预计 {buildReport(selected, range, reportData).length - 1} 条记录</div>
+            <div className="mt-2 text-[10.5px]" style={{ color: "var(--text-3)" }}>已选：{templates.find((t) => t.id === selected)?.name} · {range} · {format} · 预计 {estimatedRecords} 条记录</div>
           </Section>
 
           <Section title="地图视图截图保存">
