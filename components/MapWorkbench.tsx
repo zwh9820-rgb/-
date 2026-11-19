@@ -264,10 +264,12 @@ type RegionSelection = { level: RegionLevel; key: string; label: string; center:
 type RankItem = { key: string; label: string; count: number; sales: number; weight: number; orders: Order[]; center: [number, number] };
 
 // 统一的分组键：与下钻过滤完全一致，避免 "CA" 与 "California" 不匹配导致断层
+// 注意：城市必须带国家+州限定，否则不同地区的同名城市（如多地的 Miami/Springfield）会被合并，
+// 导致下钻到某城市后左侧订单明细混入其他地区订单。
 function groupKey(o: Order, level: RegionLevel): string {
   if (level === "country") return String(o.countryCode || "").toUpperCase();
   if (level === "state") return normalizeStateName(o.state || "");
-  return String(o.city || "").trim();
+  return `${String(o.countryCode || "").toUpperCase()}|${normalizeStateName(o.state || "")}|${String(o.city || "").trim()}`;
 }
 function groupLabel(o: Order, level: RegionLevel): string {
   if (level === "country") return o.country || o.countryCode || groupKey(o, level);
@@ -851,7 +853,17 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
       map.addLayer({ id: "delivery-line", type: "line", source: "delivery-line", paint: { "line-color": "#22c55e", "line-width": 2.5, "line-dasharray": [1, 1] } });
     }
     const html = p.type === "warehouse" ? popupWh(p) : p.type === "port" ? popupPort(p) : popupOrder(p, nearest, detailFields);
-    popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: "340px", offset: 16 }).setLngLat(p.lngLat as [number, number]).setHTML(html).addTo(map);
+    const popup = new maplibregl.Popup({ closeButton: true, maxWidth: "280px", offset: 12 }).setLngLat(p.lngLat as [number, number]).setHTML(html).addTo(map);
+    // 关键：Popup 自带 X 关闭只移除 DOM，不清 React 的 selectedFeature；
+    // 状态残留会导致下次任意渲染又把弹窗重建（"点了关闭/返回后它还留在那里"）。
+    // 直接给 X 按钮绑定点击，同步清除状态与配送线（不依赖 popup close 事件，避免程序性 remove 误触发）。
+    const xBtn = popup.getElement()?.querySelector(".maplibregl-popup-close-button");
+    xBtn?.addEventListener("click", () => {
+      popupRef.current = null;
+      setSelectedFeature(null);
+      if (map.getSource("delivery-line")) { map.removeLayer("delivery-line"); map.removeSource("delivery-line"); }
+    });
+    popupRef.current = popup;
   }, [selectedFeature, ready, WAREHOUSES, detailFields]);
 
   // ===== 框选 / 导出 =====
@@ -890,7 +902,9 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
     setExported(true); setTimeout(() => setExported(false), 2000);
   };
   const measureDist = measurePts.length >= 2 ? measurePts.slice(1).reduce((s, p, i) => s + DIST(measurePts[i], p), 0) : 0;
-  const levelTitle = !rankLevel ? "订单明细"
+  // 城市层订单明细：在标题里带上完整下钻位置（国家/州/城市），避免用户困惑"为什么突然出现订单、是不是别的地方的"
+  const drillLocation = path.length ? path.map((n) => n.label).join(" › ") : "全球";
+  const levelTitle = !rankLevel ? `${drillLocation} · 订单明细`
     : rankLevel === "country" ? "国家 / 地区" : rankLevel === "state" ? "州 / 省" : "城市";
   const activeMetric = METRICS.find((m) => m.key === metric)!;
   // 城市层：展开订单明细
@@ -1282,23 +1296,24 @@ function popupOrder(p: any, wh: any, fields: OrderFieldKey[]) {
   // 单笔订单：优先取 p.order（左侧明细点击时携带完整订单），否则从聚合属性拼装
   const order = p.order as Order | undefined;
   const isSingle = !!order || !!p.orderNo;
+  // 紧凑排版：订单弹窗曾因尺寸过大遮挡地图。改窄 + 缩小行距/内边距，长订单号用等宽小字单行省略。
   const fieldsHtml = isSingle && order
     ? (fields.length ? fields : DEFAULT_ORDER_FIELDS).map((k) => {
         const def = FIELD_MAP[k];
         if (!def) return "";
         const val = formatOrderField(order, k);
-        return `<div style="display:flex;justify-content:space-between;gap:12px"><span style="color:var(--text-3)">${def.label}</span><b style="color:${def.accent ? "var(--brand)" : "var(--text)"};text-align:right;word-break:break-all">${val}</b></div>`;
+        return `<div style="display:flex;justify-content:space-between;gap:10px;line-height:1.45"><span style="color:var(--text-3);flex-shrink:0">${def.label}</span><b style="color:${def.accent ? "var(--brand)" : "var(--text)"};text-align:right;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${val}">${val}</b></div>`;
       }).join("")
     : "";
-  return `<div style="width:${isSingle ? 300 : 280}px;font-family:inherit">
-    <div style="padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px;font-weight:700">${isSingle ? `订单 ${order?.orderNo || p.orderNo}` : `${p.label} 汇总`}</div>
-    <div style="padding:10px 12px;font-size:11.5px;line-height:1.9;color:var(--text-2)">
+  return `<div style="width:${isSingle ? 224 : 210}px;font-family:inherit">
+    <div style="padding:7px 10px;border-bottom:1px solid var(--border);font-size:11.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${isSingle ? `订单 ${order?.orderNo || p.orderNo}` : `${p.label} 汇总`}">${isSingle ? `订单 ${order?.orderNo || p.orderNo}` : `${p.label} 汇总`}</div>
+    <div style="padding:7px 10px;font-size:10.5px;line-height:1.45;color:var(--text-2)">
       ${isSingle
         ? (fieldsHtml || `<div style="color:var(--text-3)">未选择显示字段，请点顶部「字段」按钮勾选</div>`)
         : `<div style="display:flex;justify-content:space-between"><span>订单量</span><b style="color:var(--text)">${p.count} 单</b></div>
            <div style="display:flex;justify-content:space-between"><span>销售额</span><b style="color:var(--brand)">$${Number(p.sales || 0).toLocaleString()}</b></div>`}
     </div>
-    <div style="padding:8px 12px;background:rgba(51,102,255,.08);font-size:11px">${wh ? `最近仓：${wh.name}` : "暂无海外仓数据，可在数据中心录入"}</div>
+    <div style="padding:6px 10px;background:rgba(51,102,255,.08);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${wh ? `最近仓：${wh.name}` : "暂无海外仓数据"}">${wh ? `最近仓：${wh.name}` : "暂无海外仓数据"}</div>
   </div>`;
 }
 function popupWh(p: any) {
