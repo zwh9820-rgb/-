@@ -37,7 +37,10 @@ const clickRank = (label) => page.evaluate((l) => {
 
 try {
   await page.goto("http://127.0.0.1:3000/", { waitUntil: "domcontentloaded" });
-  await sleep(1500);
+  await sleep(1200);
+  // v0.1.7 起默认页改为轻量驾驶舱，需主动进入 3D 地球
+  await page.evaluate(() => [...document.querySelectorAll("nav button, button")].find((b) => (b.textContent || "").trim().includes("3D 地球"))?.click());
+  await sleep(2500);
 
   // ===== 球体旋转控制验证 =====
   const globeRoot = () => page.evaluate(() => document.querySelector("[data-auto-rotate]")?.getAttribute("data-auto-rotate"));
