@@ -5,6 +5,10 @@ const path = require("path");
 const net = require("net");
 const updater = require("./updater.cjs");
 
+// 锁定 userData 目录：应用显示名改为 LinkVue/联视 后，仍读写原数据目录，历史录入数据不丢失。
+// 必须在 app.ready 之前设置。
+app.setPath("userData", path.join(app.getPath("appData"), "cross-border-data-hub"));
+
 const isDev = !!process.env.ELECTRON_DEV;
 // 固定端口：localStorage 按 origin(协议+主机+端口)隔离，端口随机会导致每次启动读到空数据、
 // 更新前后数据"消失"。固定后业务数据跨重启/跨版本稳定保留。
@@ -79,7 +83,7 @@ function createWindow() {
     height: 960,
     minWidth: 1100,
     minHeight: 700,
-    title: "跨境全链路数据中台",
+    title: "LinkVue 联视 · 跨境数据中台",
     show: false,
     backgroundColor: "#f7f8fa",
     icon: path.join(__dirname, "icon.png"),
@@ -147,7 +151,7 @@ function buildMenu() {
           click: () => dialog.showMessageBox({
             type: "info",
             title: "关于",
-            message: "跨境全链路数据中台",
+            message: "LinkVue 联视 · 跨境全链路可视化数据中台",
             detail: `版本 ${app.getVersion()}\n多平台订单 · 海外仓 · 海运头程 · 尾程价卡一体化可视化中台\n\n技术栈：Next.js + Three.js + MapLibre GL JS + Electron`,
           }),
         },
