@@ -212,6 +212,12 @@ export default function FileCenterView({ showToast }: { showToast: (m: string) =
 
   const openPreview = async (f: ScannedFile) => {
     if (!canView(f)) { showToast("管理员已限制此文件的预览权限"); return; }
+    // PDF 用独立窗口交给 Electron 内置查看器渲染（data: URL 在 Electron 中会白屏）
+    if (f.ext === ".pdf" && fileAPI?.previewPdf) {
+      const r = await fileAPI.previewPdf(f.path, enabledRoots, f.name);
+      if (r?.ok === false) showToast(r.error || "PDF 预览失败，请点「打开」用系统程序查看");
+      return;
+    }
     setPreview(f); setPreviewLoading(true); setPreviewData(null);
     try {
       const res = await fileAPI.read(f.path, enabledRoots);
@@ -539,7 +545,7 @@ export default function FileCenterView({ showToast }: { showToast: (m: string) =
                  <div className="text-[12px]" style={{ color: "var(--red)" }}>{previewData.error}</div>
                ) : previewData.kind === "base64" ? (
                  previewData.mime.startsWith("image/") ? <img src={`data:${previewData.mime};base64,${previewData.data}`} alt={preview.name} className="max-w-full max-h-full object-contain" /> :
-                 <iframe src={`data:${previewData.mime};base64,${previewData.data}`} className="w-full h-full rounded-lg" title={preview.name} />
+                 <div className="text-center"><FileIcon ext={preview.ext} size={48} /><div className="mt-3 text-[13px]" style={{ color: "var(--text-2)" }}>此格式请在独立窗口查看</div><button className="btn btn-primary mt-3" onClick={() => doOpen(preview)}><ExternalLink size={13} /> 用系统程序打开</button></div>
                ) : (
                  <pre className="w-full h-full overflow-auto p-4 rounded-lg text-[12px] whitespace-pre-wrap break-words" style={{ background: "var(--surface)", color: "var(--text-2)" }}>{previewData.data || "（空文件）"}</pre>
                )}
