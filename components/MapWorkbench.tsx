@@ -56,6 +56,9 @@ const HEAT_PALETTES: Record<HeatPaletteKey, { label: string; solid: string[]; fi
   },
 };
 const TOP_N_OPTIONS = [3, 5, 10];
+// 是否在地图上用气泡标出城市订单榜（排名+城市名+订单数）。
+// 默认关闭：多订单时气泡互相遮挡视野，城市排名在左侧数据看板已完整呈现（这里保持不变）。
+const SHOW_CITY_MARKERS = false;
 const heatColorAt = (palette: HeatPaletteKey, rank: number, kind: "solid" | "fill") => {
   const p = HEAT_PALETTES[palette];
   if (rank >= 6) return kind === "solid" ? p.tailSolid : p.tailFill;
@@ -728,9 +731,11 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
   }, [selected, ready]);
 
   // ===== 城市 Top N 标注（点进州/省后，地图标出排名靠前的城市）=====
+  // 默认关闭（SHOW_CITY_MARKERS=false）：气泡遮挡视野，城市订单排名以左侧数据看板为准。
   useEffect(() => {
     const map = mapInstance.current; if (!map || !ready) return;
     heatMarkers.current.forEach((m) => m.remove()); heatMarkers.current = [];
+    if (!SHOW_CITY_MARKERS) { if (mapRef.current) delete mapRef.current.dataset.heatCities; return; }
     if (!showTopHeat || nextLevel !== "city" || !heatTop.length) return;
     heatTop.forEach((it, i) => {
       const rank = i + 1;
@@ -1132,7 +1137,7 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
               {[1, 2, 3, 4, 5].map((r) => <span key={r} className="flex-1 h-2.5 rounded-sm" style={{ background: heatColorAt(heatPalette, r, "solid") }} title={`第 ${r} 名`} />)}
               {topN > 5 && <span className="flex-1 h-2.5 rounded-sm" style={{ background: HEAT_PALETTES[heatPalette].tailSolid }} title="第 6 名及以后（统一色）" />}
             </div>
-            <div className="mt-2 text-[10px] leading-relaxed" style={{ color: "var(--text-3)" }}>前 5 名按深浅着色，第 6 名及以后统一浅色。进入国家看州热度，进入州看城市标注，点击可下钻。</div>
+            <div className="mt-2 text-[10px] leading-relaxed" style={{ color: "var(--text-3)" }}>前 5 名按深浅着色，第 6 名及以后统一浅色。进入国家看州热度；进入州后城市排名见左侧数据看板，点击可下钻。</div>
           </div>
         )}
 
