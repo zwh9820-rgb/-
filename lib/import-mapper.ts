@@ -342,6 +342,12 @@ export function mapRows(
       else if (entity === "inventory" && rec.skuId) rec.id = `${rec.warehouseId || "wh"}_${rec.skuId}_${startId + i}`;
       else rec.id = raw["id"] || `${entity}-${Date.now()}-${startId + i}`;
     }
+    // SKU：模板可能只填"SKU ID"而"SKU 编码"留空（如 TMY.A001）。
+    // 两列都指向同一编码，保证界面显示与订单/库存关联都正确。
+    if (entity === "skus") {
+      if (!rec.sku && rec.id) rec.sku = rec.id;
+      if (!rec.id && rec.sku) rec.id = rec.sku;
+    }
 
     // 经纬度补全（订单/仓库）：地理智能解析——按 州字段/邮编→州中心，不再逐单猜城市坐标
     if ((entity === "orders" || entity === "warehouses") && (!rec.lng || !rec.lat)) {
