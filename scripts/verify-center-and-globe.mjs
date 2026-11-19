@@ -81,23 +81,21 @@ try {
   await page.evaluate(() => [...document.querySelectorAll("nav button")].find((b) => (b.textContent || "").includes("地图"))?.click());
   await sleep(3500);
 
-  // 点美国 → 中心应落在北美（经度 -130~-60），而非法国（~0.8）
+  // v0.1.9 起：点击区域默认不再自动跳转视角，只高亮并更新数据栏
+  const beforeClick = parseCenter(await getCenter());
   await clickRank("美国");
-  await sleep(4000);
+  await sleep(2500);
   let c = parseCenter(await getCenter());
-  check("点美国后地图中心落在北美(非欧洲反面)", c.lng < -60 && c.lng > -130 && c.lat > 25 && c.lat < 50, `center=${c.lng},${c.lat}`);
+  check("点美国后视角保持不变(不自动跳转)", Math.abs(c.lng - beforeClick.lng) < 2 && Math.abs(c.lat - beforeClick.lat) < 2, `center=${c.lng},${c.lat}`);
 
-  // 点 California 州 → 中心应落在加州附近
   await clickRank("California");
-  await sleep(4000);
+  await sleep(2500);
   c = parseCenter(await getCenter());
-  check("点 California 后中心落在加州附近", c.lng < -110 && c.lng > -125 && c.lat > 30 && c.lat < 40, `center=${c.lng},${c.lat}`);
+  check("点 California 后视角保持不变", Math.abs(c.lng - beforeClick.lng) < 2 && Math.abs(c.lat - beforeClick.lat) < 2, `center=${c.lng},${c.lat}`);
 
-  // 返回上一级 → 中心回到美国范围
-  await page.evaluate(() => [...document.querySelectorAll("button")].find((b) => (b.textContent || "").includes("返回上一级"))?.click());
-  await sleep(4000);
-  c = parseCenter(await getCenter());
-  check("返回上级后中心仍在北美", c.lng < -60 && c.lng > -130, `center=${c.lng},${c.lat}`);
+  // 点击后下钻面包屑应正常更新（功能仍在）
+  const crumb = await page.evaluate(() => document.body.innerText);
+  check("点击后下钻层级正常显示", crumb.includes("美国") && crumb.includes("California"));
 
   // 回世界 → 中心接近 [10,22]
   await page.evaluate(() => [...document.querySelectorAll("button")].find((b) => b.title === "重置视图")?.click());
