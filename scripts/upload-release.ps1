@@ -13,7 +13,26 @@ $pkgPath = Join-Path (Get-Location) "package.json"
 $VERSION = (Get-Content $pkgPath -Raw | ConvertFrom-Json).version
 $TAG   = "v$VERSION"
 $TITLE = "LinkVue $VERSION"
-$NOTES = "LinkVue - Cross-border ecommerce visual data hub. Auto-update enabled. Installer: cross-border-data-hub-setup-$VERSION.exe. Keep latest.yml as the update manifest."
+
+# Release notes are generated from changelog.json (same source as the in-app view).
+$changelogPath = Join-Path (Get-Location) "changelog.json"
+$entry = $null
+if (Test-Path $changelogPath) {
+    $changelog = [System.IO.File]::ReadAllText($changelogPath, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
+    $entry = $changelog.versions | Where-Object { $_.version -eq $VERSION } | Select-Object -First 1
+}
+if ($entry) {
+    $lines = @("LinkVue $VERSION ($($entry.date))", "", "## $($entry.title)", "", "### Issues found", "")
+    foreach ($s in $entry.issues) { $lines += "- $s" }
+    $lines += @("", "### Problems solved", "")
+    foreach ($s in $entry.fixes) { $lines += "- $s" }
+    $lines += @("", "---", "", "Installer: cross-border-data-hub-setup-$VERSION.exe", "Update manifest: latest.yml (do not remove - in-app updates depend on it)", "", "The full history of issues and fixes is also available in-app: Settings > Online Update > Version history.")
+    $NOTES = $lines -join "`n"
+    Write-Host "Release notes loaded from changelog.json" -ForegroundColor Cyan
+} else {
+    Write-Warning "No changelog entry for $VERSION; using generic notes. Add it to changelog.json before publishing."
+    $NOTES = "LinkVue $VERSION - Installer: cross-border-data-hub-setup-$VERSION.exe. Keep latest.yml as the update manifest."
+}
 
 $RELEASE_DIR = Join-Path (Get-Location) "dist\github-release"
 $SETUP = Join-Path $RELEASE_DIR "cross-border-data-hub-setup-$VERSION.exe"
@@ -44,8 +63,12 @@ $HDR = @{ Authorization = "Bearer $TOKEN"; "User-Agent" = "cbh-release-uploader"
 $API = "https://api.github.com/repos/$OWNER/$REPO"
 
 function Invoke-API($method, $url, $body) {
-    $params = @{ Method=$method; Uri=$url; Headers=$HDR; ContentType="application/json" }
-    if ($body) { $params.Body = ($body | ConvertTo-Json -Compress) }
+    $params = @{ Method=$method; Uri=$url; Headers=$HDR; ContentType="application/json; charset=utf-8" }
+    if ($body) {
+        $json = $body | ConvertTo-Json -Compress -Depth 10
+        # Send UTF-8 bytes explicitly so Chinese release notes are not mangled by PowerShell 5.1
+        $params.Body = [System.Text.Encoding]::UTF8.GetBytes($json)
+    }
     return Invoke-RestMethod @params
 }
 
