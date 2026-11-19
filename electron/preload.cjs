@@ -1,5 +1,17 @@
-// 安全桥接：仅暴露更新相关的最小 IPC 接口，不开放 Node 能力
+// 安全桥接：仅暴露更新与文件中心相关的最小 IPC 接口，不开放 Node 能力
 const { contextBridge, ipcRenderer } = require("electron");
+
+// 文件中心：目录选择/扫描/预览/打开/另存。所有文件路径校验在主进程完成。
+contextBridge.exposeInMainWorld("fileAPI", {
+  chooseFolder: () => ipcRenderer.invoke("file:choose-folder"),
+  checkFolder: (folder) => ipcRenderer.invoke("file:check-folder", folder),
+  scan: (roots) => ipcRenderer.invoke("file:scan", roots),
+  listDir: (dir, roots) => ipcRenderer.invoke("file:list-dir", dir, roots),
+  read: (filePath, roots) => ipcRenderer.invoke("file:read", filePath, roots),
+  open: (filePath, roots) => ipcRenderer.invoke("file:open", filePath, roots),
+  reveal: (filePath, roots) => ipcRenderer.invoke("file:reveal", filePath, roots),
+  saveAs: (filePath, roots) => ipcRenderer.invoke("file:save-as", filePath, roots),
+});
 
 contextBridge.exposeInMainWorld("updaterAPI", {
   getInfo: () => ipcRenderer.invoke("updater:get-info"),
