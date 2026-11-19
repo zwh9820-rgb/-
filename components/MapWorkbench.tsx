@@ -5,7 +5,7 @@ import maplibregl, { Map as MLMap, GeoJSONSource } from "maplibre-gl";
 import { useStore } from "@/lib/store";
 import {
   aggregateByCountry, aggregateByState, attachCountryValues, attachStateValues,
-  featureCenter, normalizeStateName,
+  featureCenter, normalizeStateName, splitAntimeridian,
 } from "@/lib/geo-agg";
 import type { MapMetric, DrillLevel, Order, Warehouse as WarehouseT } from "@/lib/types";
 import { ORDER_FIELDS, DEFAULT_ORDER_FIELDS, loadOrderFields, saveOrderFields, formatOrderField, FIELD_MAP } from "@/lib/order-fields";
@@ -402,7 +402,8 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
     syncCenter();
 
     map.on("load", () => {
-      map.addSource("boundary", { type: "geojson", data: "/geo/world-countries.geo.json" });
+      // boundary 初始为空，fetch 后统一用反经线清洗后的数据（避免俄罗斯等跨 ±180° 出现横贯条带）
+      map.addSource("boundary", { type: "geojson", data: { type: "FeatureCollection", features: [] } as any });
       map.addSource("country-choro", { type: "geojson", data: { type: "FeatureCollection", features: [] } as any });
       map.addLayer({
         id: "country-fill", type: "fill", source: "country-choro",
@@ -426,8 +427,11 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
         paint: { "line-color": "#64748b", "line-width": 0.8, "line-opacity": 0.7 },
         layout: { visibility: "none" },
       });
-      fetch("/geo/world-countries.geo.json").then((r) => r.json()).then((geo) => {
+      fetch("/geo/world-countries.geo.json").then((r) => r.json()).then((raw) => {
+        const geo = splitAntimeridian(raw);
         countryGeo.current = geo;
+        const bsrc = map.getSource("boundary") as GeoJSONSource;
+        if (bsrc) bsrc.setData(geo);
         const src = map.getSource("country-choro") as GeoJSONSource;
         if (src) src.setData(attachCountryValues(geo, countryAgg, "count") as any);
         setGeoVersion((v) => v + 1);
@@ -562,8 +566,9 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
     setSelected({ level, key, label: derivedLabel, center: c, orders: list });
     setSelectedKey(key);
     setSelectedFeature(null); // 关闭下钻前残留的订单/仓库弹窗
-    if (c) mapInstance.current?.flyTo({ center: c, zoom: level === "country" ? 4.5 : level === "state" ? 6.5 : 10, duration: 1200, essential: true });
-  }, [scopedOrders, path]);
+    // 仅在用户开启"点击自动跳转"时才移动视角；默认保持当前视角，避免跳走后不知看哪里
+    if (c && store.mapAutoFly) mapInstance.current?.flyTo({ center: c, zoom: level === "country" ? 4.5 : level === "state" ? 6.5 : 10, duration: 1200, essential: true });
+  }, [scopedOrders, path, store.mapAutoFly]);
   selectRegionRef.current = selectRegion;
   clearSelectionRef.current = () => { setSelected(null); setSelectedKey(""); setSelectedFeature(null); };
 
@@ -1087,6 +1092,12 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
             <div className="mt-2 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
               <div className="flex items-center justify-between text-[11px] mb-1.5" style={{ color: "var(--text-2)" }}><span className="flex items-center gap-1"><Eye size={12} /> 点位不透明度</span><b style={{ color: "var(--brand)" }}>{opacity}%</b></div>
               <input type="range" min={20} max={100} value={opacity} onChange={(e) => setOpacity(+e.target.value)} className="w-full accent-blue-600" />
+            </div>
+            <div className="mt-2 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+              <label className="flex items-start gap-2 py-1 text-[11px] cursor-pointer" style={{ color: "var(--text-2)" }}>
+                <input type="checkbox" checked={store.mapAutoFly} onChange={(e) => store.setMapAutoFly(e.target.checked)} className="accent-blue-600 mt-0.5" />
+                <span>点击区域后自动跳转视角<small className="block text-[10px]" style={{ color: "var(--text-3)" }}>默认关闭，点击国家/州只高亮、不移动地图；勾选后才会飞过去放大</small></span>
+              </label>
             </div>
             <div className="mt-2 text-[10.5px]" style={{ color: "var(--text-3)" }}>地图仅高亮选中区域，指标见左侧数据栏。</div>
           </div>
