@@ -187,6 +187,14 @@ export default function FileCenterView({ showToast }: { showToast: (m: string) =
     });
   }, [q, scope, dirData.files, allFiles, prefMap, sortBy, sortAsc]);
 
+  // 分页：网盘目录可能上千文件，限制每页 DOM 数量
+  const FILE_PAGE_SIZE = 100;
+  const [filePage, setFilePage] = useState(0);
+  useEffect(() => { setFilePage(0); }, [q, scope, currentDir, sortBy, sortAsc]);
+  const filePageCount = Math.max(1, Math.ceil(displayFiles.length / FILE_PAGE_SIZE));
+  const safeFilePage = Math.min(filePage, filePageCount - 1);
+  const pagedFiles = displayFiles.slice(safeFilePage * FILE_PAGE_SIZE, (safeFilePage + 1) * FILE_PAGE_SIZE);
+
   const displayFolders = useMemo(() => {
     if (q.trim() || scope !== "tree") return [];
     return [...dirData.folders].sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
@@ -438,7 +446,7 @@ export default function FileCenterView({ showToast }: { showToast: (m: string) =
                     <td colSpan={2}><button className="text-[11px]" style={{ color: "var(--brand)" }} onClick={() => enterDir(d.path)}>打开</button></td>
                   </tr>
                 ))}
-                {displayFiles.map((f) => {
+                {pagedFiles.map((f) => {
                   const pref = prefMap[f.path];
                   return (
                     <tr key={f.path}>
@@ -481,7 +489,7 @@ export default function FileCenterView({ showToast }: { showToast: (m: string) =
                     <div className="text-[10px]" style={{ color: "var(--text-3)" }}>文件夹</div>
                   </div>
                 ))}
-                {displayFiles.map((f) => {
+                {pagedFiles.map((f) => {
                   const pref = prefMap[f.path];
                   return (
                     <div key={f.path} className="card p-3 flex flex-col gap-2 relative">
@@ -498,6 +506,13 @@ export default function FileCenterView({ showToast }: { showToast: (m: string) =
                     </div>
                   );
                 })}
+              </div>
+            )}
+            {displayFiles.length > FILE_PAGE_SIZE && (
+              <div className="flex items-center justify-center gap-2 py-3 text-[11px]" style={{ color: "var(--text-3)" }}>
+                <button className="px-3 py-1 rounded-lg" style={{ background: "var(--surface-2)" }} disabled={safeFilePage === 0} onClick={() => setFilePage((p) => Math.max(0, p - 1))}>上一页</button>
+                <span>第 {safeFilePage + 1} / {filePageCount} 页 · 共 {displayFiles.length} 个文件</span>
+                <button className="px-3 py-1 rounded-lg" style={{ background: "var(--surface-2)" }} disabled={safeFilePage >= filePageCount - 1} onClick={() => setFilePage((p) => Math.min(filePageCount - 1, p + 1))}>下一页</button>
               </div>
             )}
           </div>
