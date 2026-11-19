@@ -1,4 +1,4 @@
-# Sync local source files to GitHub repo via REST API (bypasses git push proxy issues).
+﻿# Sync local source files to GitHub repo via REST API (bypasses git push proxy issues).
 # Usage: powershell -ExecutionPolicy Bypass -NoProfile -File scripts\sync-source.ps1
 $ErrorActionPreference = "Stop"
 $OWNER = "zwh9820-rgb"
