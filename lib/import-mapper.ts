@@ -131,11 +131,15 @@ const normalizePlatform = (v: string): string => {
 // 出库单状态 → 订单状态
 const normalizeOrderStatus = (v: string): string => {
   const s = str(v);
-  if (s.includes("派送完成") || s.includes("妥投")) return "已签收";
-  if (s.includes("出库完成") || s.includes("出库确认") || s.includes("拣选完成")) return "已发货";
-  if (s.includes("派送中") || s.includes("运输")) return "运输中";
-  if (s.includes("作废")) return "异常";
-  if (s.includes("草稿")) return "待发货";
+  if (s.includes("派送完成") || s.includes("妥投") || s.includes("签收完成")) return "已签收";
+  if (s.includes("出库完成") || s.includes("出库确认") || s.includes("拣选完成") || s.includes("已出库")) return "已发货";
+  if (s.includes("派送中") || s.includes("运输") || s.includes("在途")) return "运输中";
+  // 各类失败/作废/拒收统一归为异常
+  if (s.includes("作废") || s.includes("失败") || s.includes("拒收") || s.includes("退回") || s.includes("异常")) return "异常";
+  if (s.includes("退货")) return "退货中";
+  if (s.includes("草稿") || s.includes("待出库") || s.includes("待发货")) return "待发货";
+  // 已是标准状态则原样保留
+  if (["待发货", "已发货", "运输中", "已签收", "退货中", "异常"].includes(s)) return s;
   return s || "待发货";
 };
 
@@ -159,7 +163,7 @@ export const FIELD_RULES: Record<EntityKey, FieldRule[]> = {
     { key: "qty", alias: ["总单品数（实际）", "总单品数(实际)", "数量", "件数", "qty"], convert: num },
     { key: "amount", alias: ["实际金额(总)", "预计金额(总)", "金额", "订单金额", "amount"], convert: num },
     { key: "weight", alias: ["重量(kg)", "重量", "包裹重量", "weight", "注册重量(kg)"], convert: num },
-    { key: "status", alias: ["出库单状态", "包裹状态", "派送状态", "订单状态", "status"], convert: normalizeOrderStatus },
+    { key: "status", alias: ["状态", "出库单状态", "包裹状态", "派送状态", "订单状态", "出库状态", "status"], convert: normalizeOrderStatus },
     { key: "city", alias: ["城市", "收货城市", "city"], convert: (v) => str(v) },
     { key: "state", alias: ["省份/州", "州/省", "州", "省", "state"], convert: (v) => str(v) },
     { key: "country", alias: ["国家", "国家/地区", "country"], convert: (v) => str(v) || "美国" },
