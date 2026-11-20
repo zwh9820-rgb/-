@@ -970,8 +970,9 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
           </div>
         </div>
 
-        {/* 排行榜 / 订单明细：由 showOrderList 显式驱动，返回上级立即切回排行榜，杜绝残留 */}
-        <div className="flex-1 overflow-y-auto p-2">
+        {/* 排行榜 / 订单明细：由 showOrderList 显式驱动，返回上级立即切回排行榜，杜绝残留。
+            key 绑定下钻路径：每次层级变化整块重建，任何异步渲染残留的订单卡片都不可能留在列表里。 */}
+        <div key={path.map((n) => `${n.level}:${n.key}`).join("/") || "world"} className="flex-1 overflow-y-auto p-2">
           {!showOrderList ? (
             <>
               <div className="px-1.5 py-1.5 flex items-center justify-between">
