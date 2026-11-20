@@ -323,6 +323,7 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<MLMap | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  const orderPointMarker = useRef<maplibregl.Marker | null>(null);
   const infoMarker = useRef<maplibregl.Marker | null>(null);
   const labelMarkers = useRef<maplibregl.Marker[]>([]);
   const heatMarkers = useRef<maplibregl.Marker[]>([]);
@@ -351,7 +352,6 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
   const [showWarehouses, setShowWarehouses] = useState(true);
   const [showRoutes, setShowRoutes] = useState(true);
   const [showChoro, setShowChoro] = useState(true);
-  const [showOrderPoints, setShowOrderPoints] = useState(false);
   const [showPorts, setShowPorts] = useState(true);
   const [showBoundary, setShowBoundary] = useState(true);
   const [opacity, setOpacity] = useState(100);
@@ -448,17 +448,7 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
         setGeoVersion((v) => v + 1);
       }).catch(() => {});
 
-      map.addSource("orders-pts", { type: "geojson", data: ordersGeoJSON(CITY_AGG) as any });
-      map.addLayer({
-        id: "order-glow", type: "circle", source: "orders-pts",
-        paint: { "circle-radius": 12, "circle-color": "#3366ff", "circle-opacity": 0.16 },
-        layout: { visibility: "none" },
-      });
-      map.addLayer({
-        id: "order-circle", type: "circle", source: "orders-pts",
-        paint: { "circle-radius": 5, "circle-color": "#3366ff", "circle-opacity": 0.85, "circle-stroke-color": "#fff", "circle-stroke-width": 1.5 },
-        layout: { visibility: "none" },
-      });
+      // 全图订单点位图层已移除：订单点位仅在点击订单后于其坐标处显示（见下方 selected-order-pt marker）。
       map.addSource("routes", { type: "geojson", data: routesGeoJSON(CONTAINERS) as any });
       map.addLayer({ id: "route-glow", type: "line", source: "routes", paint: { "line-color": "#0ea5e9", "line-width": 5, "line-opacity": 0.12, "line-blur": 3 } });
       map.addLayer({ id: "route-line", type: "line", source: "routes", paint: { "line-color": ["case", ["==", ["get", "status"], "延误"], "#ef4444", "#0ea5e9"], "line-width": 1.8, "line-dasharray": [3, 2], "line-opacity": 0.85 } });
@@ -487,10 +477,6 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
       const key = f.properties?._key || f.properties?.name || ""; // 归一化州名
       selectRegionRef.current("state", key, key);
     });
-    map.on("click", "order-circle", (e) => {
-      const p: any = e.features?.[0]?.properties;
-      if (p) setSelectedFeature({ type: "order", ...p, lngLat: [e.lngLat.lng, e.lngLat.lat] });
-    });
     map.on("click", "wh-circle", (e) => {
       const p: any = e.features?.[0]?.properties;
       if (p) setSelectedFeature({ type: "warehouse", ...p, lngLat: e.lngLat.toArray() });
@@ -499,13 +485,13 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
       const p: any = e.features?.[0]?.properties;
       if (p) setSelectedFeature({ type: "port", ...p, lngLat: e.lngLat.toArray() });
     });
-    ["order-circle", "wh-circle", "port-dot", "country-fill", "state-fill"].forEach((id) => {
+    ["wh-circle", "port-dot", "country-fill", "state-fill"].forEach((id) => {
       map.on("mouseenter", id, () => (map.getCanvas().style.cursor = "pointer"));
       map.on("mouseleave", id, () => (map.getCanvas().style.cursor = ""));
     });
     map.on("click", (e) => {
       if (measureModeRef.current) { setMeasurePts((p) => [...p, [e.lngLat.lng, e.lngLat.lat]]); return; }
-      const feats = map.queryRenderedFeatures(e.point, { layers: ["order-circle", "wh-circle", "port-dot", "country-fill", "state-fill"] });
+      const feats = map.queryRenderedFeatures(e.point, { layers: ["wh-circle", "port-dot", "country-fill", "state-fill"] });
       if (!feats.length) clearSelectionRef.current();
     });
 
@@ -519,6 +505,7 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
       labelMarkers.current.forEach((m) => m.remove()); labelMarkers.current = [];
       heatMarkers.current.forEach((m) => m.remove()); heatMarkers.current = [];
       infoMarker.current?.remove(); infoMarker.current = null;
+      orderPointMarker.current?.remove(); orderPointMarker.current = null;
       map.remove(); mapInstance.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -814,12 +801,11 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
     timeout = setTimeout(finish, 12000);
   }, [ready]);
 
-  // ===== 订单点位 / 航线随数据更新 =====
+  // ===== 航线随数据更新 =====
   useEffect(() => {
     const map = mapInstance.current; if (!map || !ready) return;
-    (map.getSource("orders-pts") as GeoJSONSource)?.setData(ordersGeoJSON(CITY_AGG) as any);
     (map.getSource("routes") as GeoJSONSource)?.setData(routesGeoJSON(CONTAINERS) as any);
-  }, [CITY_AGG, CONTAINERS, ready]);
+  }, [CONTAINERS, ready]);
 
   // ===== 图层显隐 / 不透明度 =====
   useEffect(() => {
@@ -830,29 +816,44 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
     vis("route-line", showRoutes); vis("route-glow", showRoutes);
     vis("port-dot", showPorts);
     vis("boundary-line", showBoundary);
-    vis("order-circle", showOrderPoints); vis("order-glow", showOrderPoints);
     const op = opacity / 100;
-    ["order-circle", "order-glow", "wh-circle", "wh-pulse", "port-dot"].forEach((id) => {
+    ["wh-circle", "wh-pulse", "port-dot"].forEach((id) => {
       if (map.getLayer(id)) {
-        const base = id.includes("glow") ? 0.16 : id.includes("pulse") ? 0.15 : 0.85;
+        const base = id.includes("pulse") ? 0.15 : 0.85;
         map.setPaintProperty(id, "circle-opacity", base * op);
       }
     });
-  }, [showWarehouses, showRoutes, showPorts, showBoundary, showOrderPoints, opacity, ready]);
+  }, [showWarehouses, showRoutes, showPorts, showBoundary, opacity, ready]);
 
-  // ===== 仓库 / 港口弹窗 =====
+  // ===== 选中要素：仓库/港口弹窗；订单点位+最近仓连线 =====
   useEffect(() => {
     const map = mapInstance.current; if (!map || !ready) return;
     popupRef.current?.remove();
+    orderPointMarker.current?.remove(); orderPointMarker.current = null;
     if (map.getSource("delivery-line")) { map.removeLayer("delivery-line"); map.removeSource("delivery-line"); }
+    if (mapRef.current) { delete mapRef.current.dataset.deliveryLine; delete mapRef.current.dataset.orderPoint; }
     if (!selectedFeature || selectedFeature.type === "region") return;
     const p = selectedFeature;
     const nearest = p.lngLat && WAREHOUSES.length ? [...WAREHOUSES].sort((a, b) => DIST([a.lng, a.lat], p.lngLat) - DIST([b.lng, b.lat], p.lngLat))[0] : null;
-    if (nearest && p.type === "order") {
-      map.addSource("delivery-line", { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: greatCircle(p.lngLat, [nearest.lng, nearest.lat], 32) }, properties: {} } as any });
-      map.addLayer({ id: "delivery-line", type: "line", source: "delivery-line", paint: { "line-color": "#22c55e", "line-width": 2.5, "line-dasharray": [1, 1] } });
+    if (p.type === "order") {
+      // 订单点位：仅点击订单后在此显示（全图点位层已移除）；同时画到最近仓的绿色连线（用户要保留）。
+      // 不再弹地图详情卡——订单详情已完整显示在左侧卡片上。
+      if (p.lngLat) {
+        const dot = document.createElement("div");
+        dot.style.cssText = "width:14px;height:14px;border-radius:50%;background:#3366ff;border:2px solid #fff;box-shadow:0 0 0 4px rgba(51,102,255,.22),0 2px 6px rgba(0,0,0,.3);cursor:pointer";
+        dot.title = p.orderNo || p.label || "订单";
+        orderPointMarker.current = new maplibregl.Marker({ element: dot }).setLngLat(p.lngLat as [number, number]).addTo(map);
+        if (mapRef.current) mapRef.current.dataset.orderPoint = "1";
+      }
+      if (nearest) {
+        map.addSource("delivery-line", { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: greatCircle(p.lngLat, [nearest.lng, nearest.lat], 32) }, properties: {} } as any });
+        map.addLayer({ id: "delivery-line", type: "line", source: "delivery-line", paint: { "line-color": "#22c55e", "line-width": 2.5, "line-dasharray": [1, 1] } });
+        if (mapRef.current) mapRef.current.dataset.deliveryLine = nearest.id || nearest.name || "1";
+      }
+      popupRef.current = null;
+      return;
     }
-    const html = p.type === "warehouse" ? popupWh(p) : p.type === "port" ? popupPort(p) : popupOrder(p, nearest, detailFields);
+    const html = p.type === "warehouse" ? popupWh(p) : popupPort(p);
     // closeOnClick:false —— 禁止"点地图空白处关闭"，否则只关 DOM 不清 state 会残留；统一走 X 按钮（下方绑定了清 state）
     const popup = new maplibregl.Popup({ closeButton: true, closeOnClick: false, maxWidth: "280px", offset: 12 }).setLngLat(p.lngLat as [number, number]).setHTML(html).addTo(map);
     // 关键：Popup 自带 X 关闭只移除 DOM，不清 React 的 selectedFeature；
@@ -861,8 +862,10 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
     const xBtn = popup.getElement()?.querySelector(".maplibregl-popup-close-button");
     xBtn?.addEventListener("click", () => {
       popupRef.current = null;
+      orderPointMarker.current?.remove(); orderPointMarker.current = null;
       setSelectedFeature(null);
       if (map.getSource("delivery-line")) { map.removeLayer("delivery-line"); map.removeSource("delivery-line"); }
+      if (mapRef.current) { delete mapRef.current.dataset.orderPoint; delete mapRef.current.dataset.deliveryLine; }
     });
     popupRef.current = popup;
   }, [selectedFeature, ready, WAREHOUSES, detailFields]);
@@ -1106,7 +1109,6 @@ export default function MapWorkbench({ onNavigate }: { onNavigate: (k: any) => v
             <div className="text-[12px] font-semibold mb-3 flex items-center justify-between"><span className="flex items-center gap-1.5"><Layers3 size={14} /> 图层控制</span><button onClick={() => setPanel(null)}><X size={14} /></button></div>
             {[
               { label: "区域着色", checked: showChoro, set: setShowChoro, icon: BarChart3 },
-              { label: "订单点位（可选）", checked: showOrderPoints, set: setShowOrderPoints, icon: MapPin },
               { label: "海外仓点位", checked: showWarehouses, set: setShowWarehouses, icon: Warehouse },
               { label: "海运航线", checked: showRoutes, set: setShowRoutes, icon: Ship },
               { label: "港口点位", checked: showPorts, set: setShowPorts, icon: Anchor },
