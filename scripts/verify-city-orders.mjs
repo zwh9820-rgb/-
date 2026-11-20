@@ -59,16 +59,27 @@ try {
   add("US", "美国", "CA", "Springfield", 3);
   add("US", "美国", "NY", "Springfield", 5);
   add("DE", "德国", "", "Springfield", 2);
-  await page.evaluate((os) => {
+  // 注入一个仓库，供"点击订单→最近仓连线"验证（连线依赖 WAREHOUSES 非空）
+  const warehouses = [{
+    id: "wh-test", name: "测试美西仓", code: "US-LAX", country: "美国", countryCode: "US", state: "California", city: "Los Angeles",
+    lng: -118.24, lat: 34.05, capacity: 10000, used: 3000, health: "healthy", skuCount: 5, dailyOutbound: 100,
+  }];
+  await page.evaluate(({ os, whs }) => {
     Object.keys(localStorage).filter((k) => k.startsWith("cbh_")).forEach((k) => localStorage.removeItem(k));
     localStorage.setItem("cbh_data_orders_v1", JSON.stringify(os));
-  }, orders);
+    localStorage.setItem("cbh_data_warehouses_v1", JSON.stringify(whs));
+  }, { os: orders, whs: warehouses });
   await page.reload({ waitUntil: "domcontentloaded" });
   await sleep(2000);
   await page.evaluate(() => [...document.querySelectorAll("nav button")].find((b) => (b.textContent || "").includes("地图下钻分析"))?.click());
   await sleep(3000);
 
   check("进入地图世界层", (await body()).includes("国家 / 地区"));
+  // 全图订单点位已移除：未点击订单时不应有点位标记（dataset.orderPoint 由点击订单时设置）
+  const noPointBefore = await page.evaluate(() => !document.querySelector(".maplibregl-map")?.dataset?.orderPoint);
+  check("未点击订单时地图无订单点位", noPointBefore);
+  const noOrderPointSwitch = await page.evaluate(() => ![...document.querySelectorAll("label")].some((l) => (l.textContent || "").includes("订单点位（可选）")));
+  check("图层面板已移除「订单点位（可选）」开关", noOrderPointSwitch);
 
   // 下钻美国 → CA → Springfield
   check("下钻美国", await clickRank("美国")); await sleep(1600);
@@ -106,32 +117,32 @@ try {
   check("不混入德国同名城市订单(ORD0008-0009)", !orderNos.some((x) => ["ORD0008", "ORD0009"].includes(x)), orderNos.join(","));
   check("订单明细恰好 3 笔", orderNos.length === 3, `count=${orderNos.length} ${orderNos.join(",")}`);
 
-  // 点击第一笔订单 → 弹窗紧凑（宽度 <= 240px）
+  // 点击第一笔订单 → 不弹地图订单卡片（用户要求去掉，详情已在左侧），但保留最近仓连线
   await page.evaluate(() => {
     const b = [...document.querySelectorAll("button")].find((x) => (x.textContent || "").includes("ORD0000"));
     b?.click();
   });
   await sleep(1200);
-  const popup = await page.evaluate(() => {
-    const pc = document.querySelector(".maplibregl-popup-content");
-    const inner = pc?.firstElementChild;
-    return { exists: !!pc, width: inner ? inner.getBoundingClientRect().width : 0, text: (pc?.textContent || "").slice(0, 120) };
-  });
-  check("点击订单弹出详情", popup.exists && popup.text.includes("ORD0000"), popup.text.slice(0, 60));
-  check("订单弹窗已紧凑(内容宽<=240px)", popup.width > 0 && popup.width <= 240, `width=${popup.width}px`);
+  const afterClick = await page.evaluate(() => ({
+    popup: !!document.querySelector(".maplibregl-popup"),
+    deliveryLine: document.querySelector(".maplibregl-map")?.dataset?.deliveryLine || "",
+    orderPoint: document.querySelector(".maplibregl-map")?.dataset?.orderPoint || "",
+  }));
+  check("点击订单不弹地图订单卡片", !afterClick.popup, `popup=${afterClick.popup}`);
+  check("点击订单后出现订单点位", afterClick.orderPoint === "1", `orderPoint=${afterClick.orderPoint}`);
+  check("点击订单保留最近仓连线", !!afterClick.deliveryLine, `deliveryLine=${afterClick.deliveryLine}`);
 
-  // 点 X 关闭弹窗 → 触发其他 UI 变化 → 弹窗不应重建（验证 selectedFeature 状态已同步清除）
-  await page.evaluate(() => { (document.querySelector(".maplibregl-popup-close-button"))?.click(); });
-  await sleep(600);
-  const afterClose = await page.evaluate(() => !!document.querySelector(".maplibregl-popup"));
-  check("点 X 关闭后弹窗消失", !afterClose);
-  // 触发一次无关的 UI 重渲染（开关图层面板）
+  // 触发一次无关 UI 重渲染（开关图层面板），地图订单卡片仍不应出现、连线仍在
   await page.evaluate(() => { const b = [...document.querySelectorAll("button")].find((x) => (x.getAttribute("title") || "") === "图层控制"); b?.click(); });
   await sleep(700);
   await page.evaluate(() => { const b = [...document.querySelectorAll("button")].find((x) => (x.getAttribute("title") || "") === "图层控制"); b?.click(); });
   await sleep(500);
-  const afterRerender = await page.evaluate(() => !!document.querySelector(".maplibregl-popup"));
-  check("关闭后重渲染不再重建弹窗(无残留)", !afterRerender);
+  const afterRerender = await page.evaluate(() => ({
+    popup: !!document.querySelector(".maplibregl-popup"),
+    deliveryLine: document.querySelector(".maplibregl-map")?.dataset?.deliveryLine || "",
+  }));
+  check("重渲染后仍无地图订单卡片", !afterRerender.popup);
+  check("重渲染后连线仍保留", !!afterRerender.deliveryLine);
 
   // ===== 返回上级后，订单明细卡片必须消失（用户反馈的核心残留问题）=====
   // 当前在城市层(订单明细)。返回一级应到 CA 城市排名，订单卡片必须清空。
@@ -150,6 +161,8 @@ try {
   check("城市层有返回上一级按钮", await clickBack()); await sleep(1300);
   check("返回到 CA 城市层后订单卡片清空", (await orderCardsInList()) === 0, `残留卡片=${await orderCardsInList()}`);
   check("返回后显示城市排名", (await body()).includes("城市 · 按订单量排序"));
+  check("返回后最近仓连线清除", !(await page.evaluate(() => !!(document.querySelector(".maplibregl-map")?.dataset?.deliveryLine))));
+  check("返回后订单点位清除", !(await page.evaluate(() => !!(document.querySelector(".maplibregl-map")?.dataset?.orderPoint))));
 
   // 再返回到美国州层
   await clickBack(); await sleep(1300);
