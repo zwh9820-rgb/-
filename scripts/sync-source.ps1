@@ -42,6 +42,7 @@ $FILES = @(
     "scripts/verify-map-click.mjs",
     "scripts/verify-top-heat.mjs",
     "scripts/verify-city-orders.mjs",
+    "scripts/verify-order-fields.mjs",
     "scripts/repro-image-text-preview.mjs",
     "scripts/verify-changelog.mjs",
     "scripts/verify-data-doctor.mjs",
