@@ -96,13 +96,17 @@ try {
   check("列表出现 SKU 值", body.includes("SKU-0"));
   check("列表出现邮编值", body.includes("90001"));
 
-  // 点订单卡片 → 弹窗显示所选字段
+  // 点订单卡片 → 地图不再弹详情卡（用户要求），所选字段以左侧订单卡片为准
   await page.evaluate(() => { const b = [...document.querySelectorAll("button")].find((x) => (x.textContent || "").includes("ORD0")); if (b) b.click(); });
   await sleep(600);
-  // 弹窗在 maplibre popup 容器内
   const popup = await page.evaluate(() => [...document.querySelectorAll(".maplibregl-popup")].map((p) => p.textContent).join(" | "));
-  check("弹窗显示订单号", popup.includes("ORD0"), popup.slice(0, 120));
-  check("弹窗显示勾选的 SKU/邮编", popup.includes("SKU-0") && popup.includes("90001"), popup.slice(0, 200));
+  check("点订单无地图弹窗", popup.length === 0, popup.slice(0, 60));
+  const cardText = await page.evaluate(() => {
+    const b = [...document.querySelectorAll("button")].find((x) => (x.textContent || "").includes("ORD0"));
+    return b?.textContent || "";
+  });
+  check("订单卡片显示订单号", cardText.includes("ORD0"), cardText.slice(0, 80));
+  check("订单卡片显示勾选的 SKU/邮编", cardText.includes("SKU-0") && cardText.includes("90001"), cardText.slice(0, 160));
 
   // 取消金额字段 → 列表不应再显示金额值（123.45）
   await openFieldsPanel(); await sleep(300);
