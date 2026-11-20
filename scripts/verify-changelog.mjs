@@ -21,8 +21,16 @@ let b;
 try {
   for (let i = 0; i < 40; i++) { await sleep(500); try { b = await puppeteer.connect({ browserURL: "http://127.0.0.1:9251", defaultViewport: null }); break; } catch {} }
   if (!b) throw new Error("CDP fail");
-  await sleep(4000);
-  const page = (await b.pages()).find((p) => p.url().includes("127.0.0.1")) || (await b.pages())[0];
+  // 等待应用页真正加载（pages() 存在 CDP 时序问题，且首次启动较慢）
+  let page;
+  for (let i = 0; i < 40; i++) {
+    const pages = await b.pages();
+    page = pages.find((p) => (p.url() || "").includes("127.0.0.1"));
+    if (page) { try { await page.waitForFunction(() => document.body?.innerText?.includes("地图下钻分析") || document.body?.innerText?.includes("经营驾驶舱"), { timeout: 2000 }); break; } catch {} }
+    await sleep(500);
+  }
+  if (!page) page = (await b.pages())[0];
+  if (!page) throw new Error("no app page");
   const clickText = async (text) => page.evaluate((t) => {
     const els = Array.from(document.querySelectorAll("button, a, div[role=button], span"));
     const el = els.find((e) => (e.textContent || "").trim() === t || (e.textContent || "").includes(t));
